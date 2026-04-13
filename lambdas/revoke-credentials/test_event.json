@@ -1,0 +1,12 @@
+{
+  "Records": [
+    {
+      "messageId": "test-msg-002",
+      "receiptHandle": "test-handle",
+      "body": "{\"incident_type\": \"CREDENTIAL_LEAK\", \"severity\": \"CRITICAL\", \"sourceIPAddress\": \"198.51.100.77\", \"affectedResource\": \"iam:user/dev-operator\", \"timestamp\": \"2024-01-15T11:00:00Z\"}",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:000000000000:tesis-incident-queue",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}

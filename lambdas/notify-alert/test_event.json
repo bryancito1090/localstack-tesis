@@ -1,0 +1,15 @@
+{
+  "Records": [
+    {
+      "messageId": "test-msg-001",
+      "receiptHandle": "test-handle",
+      "body": "{\"incident_type\": \"BRUTE_FORCE\", \"severity\": \"HIGH\", \"sourceIPAddress\": \"203.0.113.42\", \"affectedResource\": \"iam:user/admin\", \"timestamp\": \"2024-01-15T10:30:00Z\"}",
+      "attributes": {},
+      "messageAttributes": {},
+      "md5OfBody": "",
+      "eventSource": "aws:sqs",
+      "eventSourceARN": "arn:aws:sqs:us-east-1:000000000000:tesis-incident-queue",
+      "awsRegion": "us-east-1"
+    }
+  ]
+}
