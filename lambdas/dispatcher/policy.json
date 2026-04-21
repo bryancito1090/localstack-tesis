@@ -1,0 +1,32 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "InvokePlaybooks",
+      "Effect": "Allow",
+      "Action": ["lambda:InvokeFunction"],
+      "Resource": [
+        "arn:aws:lambda:us-east-1:000000000000:function:tesis-notify-alert",
+        "arn:aws:lambda:us-east-1:000000000000:function:tesis-block-ip",
+        "arn:aws:lambda:us-east-1:000000000000:function:tesis-revoke-credentials",
+        "arn:aws:lambda:us-east-1:000000000000:function:tesis-isolate-instance"
+      ]
+    },
+    {
+      "Sid": "ConsumeSQS",
+      "Effect": "Allow",
+      "Action": [
+        "sqs:ReceiveMessage",
+        "sqs:DeleteMessage",
+        "sqs:GetQueueAttributes"
+      ],
+      "Resource": "arn:aws:sqs:us-east-1:000000000000:tesis-incident-queue"
+    },
+    {
+      "Sid": "CloudWatchLogs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:us-east-1:000000000000:log-group:/tesis/lambda-responses:*"
+    }
+  ]
+}
