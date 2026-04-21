@@ -18,8 +18,13 @@ BUCKET    = os.environ.get("S3_BUCKET", "tesis-security-logs")
 QUEUE     = os.environ.get("SQS_QUEUE", "tesis-incident-queue")
 QUEUE_URL = f"{ENDPOINT}/000000000000/{QUEUE}"
 
-s3  = boto3.client("s3",  endpoint_url=ENDPOINT, region_name=REGION)
-sqs = boto3.client("sqs", endpoint_url=ENDPOINT, region_name=REGION)
+_KEY    = os.environ.get("AWS_ACCESS_KEY_ID", "test")
+_SECRET = os.environ.get("AWS_SECRET_ACCESS_KEY", "test")
+
+s3  = boto3.client("s3",  endpoint_url=ENDPOINT, region_name=REGION,
+                   aws_access_key_id=_KEY, aws_secret_access_key=_SECRET)
+sqs = boto3.client("sqs", endpoint_url=ENDPOINT, region_name=REGION,
+                   aws_access_key_id=_KEY, aws_secret_access_key=_SECRET)
 
 SEVERITY_MAP = {
     "brute-force":          "HIGH",

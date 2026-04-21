@@ -1,18 +1,20 @@
 -- Detección de Fuerza Bruta
 -- Busca >5 intentos fallidos de ConsoleLogin desde la misma IP en una ventana de 5 minutos
 -- Equivalente a una regla Athena sobre la tabla de CloudTrail
+-- Sintaxis DuckDB: acceso por campo de struct (r.campo), no por operador JSON (->>)
 
 SELECT
-    sourceIPAddress,
-    userIdentity.userName                                   AS username,
-    COUNT(*)                                                AS failed_attempts,
-    MIN(eventTime)                                          AS first_attempt,
-    MAX(eventTime)                                          AS last_attempt,
-    epoch_ms(MAX(epoch_ms(last_attempt)) - MIN(epoch_ms(first_attempt))) AS window_seconds
-FROM read_json_auto('$LOG_PATH', format='array')
-WHERE eventName     = 'ConsoleLogin'
-  AND errorCode     = 'AccessDenied'
-  AND epoch_ms(eventTime) >= now() - INTERVAL '1 hour'
-GROUP BY sourceIPAddress, userIdentity.userName
+    r.sourceIPAddress,
+    r.userIdentity.userName                                    AS username,
+    COUNT(*)                                                   AS failed_attempts,
+    MIN(r.eventTime)                                           AS first_attempt,
+    MAX(r.eventTime)                                           AS last_attempt
+FROM (
+    SELECT unnest(Records) AS r
+    FROM read_json_auto('$LOG_PATH')
+)
+WHERE r.eventName = 'ConsoleLogin'
+  AND r.errorCode = 'AccessDenied'
+GROUP BY r.sourceIPAddress, r.userIdentity.userName
 HAVING COUNT(*) > 5
 ORDER BY failed_attempts DESC;

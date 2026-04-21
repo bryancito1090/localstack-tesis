@@ -8,7 +8,10 @@ import os
 import boto3
 from datetime import datetime, timezone
 
-ENDPOINT = os.environ.get("AWS_ENDPOINT_URL", "http://localhost:4566")
+# LOCALSTACK_HOSTNAME es inyectada por LocalStack en contenedores Lambda (Docker executor)
+# Permite que la Lambda alcance LocalStack sin hardcodear IPs que cambian entre reinicios
+_ls_host = os.environ.get("LOCALSTACK_HOSTNAME", "localhost")
+ENDPOINT = os.environ.get("AWS_ENDPOINT_URL", f"http://{_ls_host}:4566")
 REGION   = os.environ.get("AWS_DEFAULT_REGION", "us-east-1")
 SNS_ARN  = os.environ.get("SNS_ALERTS_ARN", "arn:aws:sns:us-east-1:000000000000:tesis-security-alerts")
 

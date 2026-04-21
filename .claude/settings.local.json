@@ -30,7 +30,21 @@
       "Bash(curl -sv http://localhost:4566/_localstack/health)",
       "Bash(docker system:*)",
       "Bash(docker image ls:*)",
-      "Bash(bash:*)"
+      "Bash(bash:*)",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test .venv/bin/awslocal s3 ls s3://tesis-security-logs/cloudtrail/ --recursive)",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test .venv/bin/awslocal sqs get-queue-attributes --queue-url http://localhost:4566/000000000000/tesis-incident-queue --attribute-names ApproximateNumberOfMessages)",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test .venv/bin/awslocal s3 sync s3://tesis-security-logs/cloudtrail/ /tmp/tesis-logs/)",
+      "Read(//tmp/**)",
+      "Bash(.venv/bin/python3 *)",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test .venv/bin/awslocal lambda get-function --function-name tesis-notify-alert)",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test /home/bryan/localstack-tesis/.venv/bin/awslocal lambda get-function --function-name tesis-notify-alert)",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test /home/bryan/localstack-tesis/.venv/bin/awslocal lambda *)",
+      "Bash(/home/bryan/localstack-tesis/.venv/bin/awslocal lambda *)",
+      "Bash(python3 -c \"import zipfile; z=zipfile.ZipFile\\('/tmp/notify-alert.zip','w'\\); z.write\\('handler.py'\\); z.close\\(\\)\")",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test /home/bryan/localstack-tesis/.venv/bin/awslocal sns list-subscriptions)",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test /home/bryan/localstack-tesis/.venv/bin/awslocal logs describe-log-groups --query 'logGroups[].logGroupName' --output text)",
+      "Bash(/home/bryan/localstack-tesis/.venv/bin/awslocal logs *)",
+      "Bash(AWS_ACCESS_KEY_ID=test AWS_SECRET_ACCESS_KEY=test AWS_DEFAULT_REGION=us-east-1 AWS_ENDPOINT_URL=http://localhost:4566 .venv/bin/python3 *)"
     ]
   }
 }

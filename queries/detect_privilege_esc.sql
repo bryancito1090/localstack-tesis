@@ -1,15 +1,19 @@
 -- Detección de Escalada de Privilegios
 -- Busca eventos IAM sospechosos: adjuntar políticas admin, crear keys, modificar roles
+-- Sintaxis DuckDB: acceso por campo de struct (r.campo), no por operador JSON (->>)
 
 SELECT
-    userIdentity.userName      AS username,
-    sourceIPAddress,
-    eventName,
-    eventTime,
-    requestParameters
-FROM read_json_auto('$LOG_PATH', format='array')
-WHERE eventSource = 'iam.amazonaws.com'
-  AND eventName IN (
+    r.userIdentity.userName  AS username,
+    r.sourceIPAddress,
+    r.eventName,
+    r.eventTime,
+    r.requestParameters
+FROM (
+    SELECT unnest(Records) AS r
+    FROM read_json_auto('$LOG_PATH')
+)
+WHERE r.eventSource = 'iam.amazonaws.com'
+  AND r.eventName IN (
       'AttachUserPolicy',
       'AttachRolePolicy',
       'CreateAccessKey',
@@ -18,5 +22,4 @@ WHERE eventSource = 'iam.amazonaws.com'
       'CreateLoginProfile',
       'UpdateLoginProfile'
   )
-  AND epoch_ms(eventTime) >= now() - INTERVAL '24 hours'
-ORDER BY eventTime DESC;
+ORDER BY r.eventTime DESC;
