@@ -42,6 +42,17 @@
         "logs:DescribeLogStreams"
       ],
       "Resource": "arn:aws:logs:us-east-1:000000000000:log-group:/tesis/*:*"
+    },
+    {
+      "Sid": "EC2NetworkAclEnforcement",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeVpcs",
+        "ec2:DescribeNetworkAcls",
+        "ec2:CreateNetworkAclEntry",
+        "ec2:DeleteNetworkAclEntry"
+      ],
+      "Resource": "*"
     }
   ]
 }
