@@ -9,7 +9,7 @@ services:
       - "127.0.0.1:4510-4559:4510-4559"
     environment:
       - DEBUG=${DEBUG:-0}
-      - SERVICES=s3,sns,sqs,lambda,iam,logs,cloudwatch,events
+      - SERVICES=s3,sns,sqs,lambda,iam,logs,cloudwatch,events,ec2
       - DOCKER_HOST=unix:///var/run/docker.sock
       - LAMBDA_EXECUTOR=docker
       - LAMBDA_DOCKER_NETWORK=localstack-tesis_default

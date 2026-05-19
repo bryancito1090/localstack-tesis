@@ -86,6 +86,22 @@ awslocal iam put-role-policy \
     --policy-document file://$(dirname "$0")/lambda-policies/base-policy.json 2>/dev/null || true
 log "IAM Role: $ROLE_ARN"
 
+# ── EC2 / Network ACL (punto de cumplimiento de block-ip) ─────────────────────
+warn "Verificando VPC y Network ACL objetivo para block-ip..."
+# LocalStack crea una VPC por defecto automáticamente al usar EC2.
+VPC_ID=$(awslocal ec2 describe-vpcs --filters "Name=isDefault,Values=true" \
+    --query 'Vpcs[0].VpcId' --output text 2>/dev/null) || VPC_ID="None"
+if [ "$VPC_ID" = "None" ] || [ -z "$VPC_ID" ]; then
+    VPC_ID=$(awslocal ec2 create-vpc --cidr-block 10.0.0.0/16 \
+        --query 'Vpc.VpcId' --output text)
+    warn "VPC por defecto no existía; creada $VPC_ID"
+fi
+NACL_ID=$(awslocal ec2 describe-network-acls \
+    --filters "Name=vpc-id,Values=$VPC_ID" "Name=default,Values=true" \
+    --query 'NetworkAcls[0].NetworkAclId' --output text 2>/dev/null)
+log "EC2 VPC objetivo:   $VPC_ID"
+log "EC2 Network ACL:    $NACL_ID  (aquí block-ip añade reglas DENY)"
+
 # ── Resumen ───────────────────────────────────────────────────────────────────
 echo ""
 echo "========================================"
