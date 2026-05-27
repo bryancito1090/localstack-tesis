@@ -89,7 +89,12 @@
       "Bash(nlm login *)",
       "Bash(~/.local/bin/nlm notebook *)",
       "Bash(export PATH=\"$PWD/.venv/bin:$PATH\")",
-      "Bash(awslocal logs *)"
+      "Bash(awslocal logs *)",
+      "Bash(aws sts *)",
+      "Bash(curl -s ifconfig.me)",
+      "Bash(curl -s api.ipify.org)",
+      "Bash(AWS_ACCESS_KEY_ID=\"AKIA33HIGN6KSERFX6XT\" AWS_SECRET_ACCESS_KEY=\"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\" AWS_DEFAULT_REGION=\"ca-central-1\" aws sts get-caller-identity *)",
+      "Bash(aws sns list-subscriptions-by-topic *)"
     ]
   }
 }
