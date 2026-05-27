@@ -102,6 +102,33 @@ NACL_ID=$(awslocal ec2 describe-network-acls \
 log "EC2 VPC objetivo:   $VPC_ID"
 log "EC2 Network ACL:    $NACL_ID  (aquí block-ip añade reglas DENY)"
 
+# ── IAM usuarios de prueba (para demo revoke-credentials) ────────────────────
+warn "Creando usuarios IAM de prueba para demos de incidentes..."
+for user in admin dev-operator ci-runner readonly-audit external-contractor; do
+    awslocal iam create-user --user-name "$user" > /dev/null 2>&1 || true
+    # Crear access key solo si el usuario no tiene ninguna
+    key_count=$(awslocal iam list-access-keys --user-name "$user" \
+        --query 'length(AccessKeyMetadata)' --output text 2>/dev/null || echo "0")
+    if [ "$key_count" = "0" ]; then
+        awslocal iam create-access-key --user-name "$user" > /dev/null 2>/dev/null || true
+        log "IAM user $user: access key Active creada"
+    else
+        log "IAM user $user: ya tiene key(s)"
+    fi
+done
+
+# ── S3 prod-data-bucket (para demo exfiltración) ──────────────────────────────
+warn "Creando bucket prod-data-bucket con datos de prueba..."
+awslocal s3 mb s3://prod-data-bucket --region $REGION 2>/dev/null || warn "Bucket ya existe"
+for i in $(seq 0 9); do
+    awslocal s3api put-object \
+        --bucket prod-data-bucket \
+        --key "data/record_$(printf '%04d' $i).json" \
+        --body <(echo "{\"record\": $i, \"data\": \"sensitive-value-$i\", \"pii\": true}") \
+        > /dev/null 2>&1 || true
+done
+log "S3: s3://prod-data-bucket [10 archivos sensibles de prueba]"
+
 # ── Resumen ───────────────────────────────────────────────────────────────────
 echo ""
 echo "========================================"

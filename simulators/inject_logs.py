@@ -57,11 +57,28 @@ def inject(incident_type: str):
 
     # 2. Detectar el evento más relevante para el payload de respuesta
     first = events[0]
+
+    # El recurso afectado depende del tipo de incidente:
+    # - exfiltration → el bucket S3 que se está extrayendo
+    # - demás         → el usuario IAM del atacante
+    if incident_type == "exfiltration":
+        resources = first.get("resources", [])
+        if resources:
+            arn = resources[0].get("ARN", "")
+            # arn:aws:s3:::prod-data-bucket/data/record_0000.json
+            #   → s3:bucket/prod-data-bucket
+            bucket_name = arn.split(":::")[1].split("/")[0] if ":::" in arn else "prod-data-bucket"
+        else:
+            bucket_name = "prod-data-bucket"
+        affected_resource = f"s3:bucket/{bucket_name}"
+    else:
+        affected_resource = f"iam:user/{first['userIdentity']['userName']}"
+
     payload = {
         "incident_type":    incident_type.replace("-", "_").upper(),
         "severity":         SEVERITY_MAP.get(incident_type, "MEDIUM"),
         "sourceIPAddress":  first.get("sourceIPAddress", "0.0.0.0"),
-        "affectedResource": f"iam:user/{first['userIdentity']['userName']}",
+        "affectedResource": affected_resource,
         "s3_log_key":       s3_key,
         "event_count":      len(events),
         "timestamp":        first.get("eventTime", datetime.now(timezone.utc).isoformat()),
