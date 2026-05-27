@@ -178,3 +178,18 @@ Equivale a una consulta Athena sobre la tabla CloudTrail catalogada por Glue.
 ```
 
 El almacenamiento es la columna vertebral: cada fase deja una **evidencia consultable y trazable**, desde el log del ataque hasta la prueba del bloqueo real.
+
+El diseño se ha estructurado bajo un enfoque de separación de responsabilidades y preservación forense de la evidencia, destacando las siguientes decisiones arquitectónicas:
+
+    Arquitectura Data Lake (Zero-ETL): Toda la información se centraliza en un bucket único particionado en Amazon S3. Esto permite ejecutar consultas analíticas directas sobre los archivos en reposo utilizando DuckDB (en el entorno local) y Amazon Athena (en producción), eliminando la necesidad de mover o duplicar datos.
+
+    Desacoplamiento con Tolerancia a Fallos: Se interpuso un bus de mensajería (Amazon SQS) junto con una Dead Letter Queue (DLQ) entre el motor de detección y los playbooks. Esto garantiza la entrega del incidente; si la mitigación falla, el evento se reintenta y/o se aísla, evitando la pérdida de alertas críticas.
+
+    Contratos de Datos Estrictos: Se estandarizaron los esquemas JSON tanto para el payload de tránsito del incidente como para la evidencia de mitigación. Destaca la inclusión de un bloque de enforcement que audita exactamente dónde y cómo se aplicó el bloqueo (ej. ID de la Network ACL y regla específica).
+
+    Gobernanza y Cadena de Custodia: El almacenamiento se divide en tres capas lógicas: Forense (S3, inmutable a través de S3 Object Lock para preservar la integridad del ataque y la respuesta), Tránsito (SQS, efímera) y Operativa (CloudWatch, para trazas lógicas de ejecución).
+
+cd ~/localstack-tesis
+  docker compose up -d          # si LocalStack no está corriendo
+  bash infra/setup.sh           # bootstrap (idempotente)
+  bash demo/demo_stack.sh       # demo narrada, avanza con ENTER

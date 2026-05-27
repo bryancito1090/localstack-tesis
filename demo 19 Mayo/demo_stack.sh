@@ -13,6 +13,68 @@ set -uo pipefail
 cd "$(dirname "$0")/.."
 export PATH="$PWD/.venv/bin:$PATH"
 
+# ── PREFLIGHT: asegurar LocalStack + recursos + lambdas ──────────────────────
+_preflight() {
+  local C_OK='\033[0;32m'; local C_WARN='\033[1;33m'; local NC='\033[0m'
+  echo -e "${C_WARN}[preflight] Verificando entorno...${NC}"
+
+  # 1. LocalStack
+  if ! curl -sf http://localhost:4566/_localstack/health > /dev/null 2>&1; then
+    echo -e "${C_WARN}[preflight] Levantando LocalStack...${NC}"
+    docker compose up -d
+    echo -n "[preflight] Esperando que LocalStack esté listo"
+    for i in $(seq 1 30); do
+      curl -sf http://localhost:4566/_localstack/health > /dev/null 2>&1 && break
+      echo -n "." ; sleep 2
+    done
+    echo ""
+  fi
+  echo -e "${C_OK}[preflight] LocalStack OK${NC}"
+
+  # 2. Bootstrap (idempotente)
+  bash infra/setup.sh > /dev/null 2>&1
+  echo -e "${C_OK}[preflight] Recursos AWS OK (S3, SNS, SQS, IAM, EC2/NACL)${NC}"
+
+  # 3. Desplegar / actualizar lambdas
+  local ROLE="arn:aws:iam::000000000000:role/tesis-lambda-response-role"
+  local ENV_VARS="Variables={S3_BUCKET=tesis-security-logs,SNS_ALERTS_ARN=arn:aws:sns:us-east-1:000000000000:tesis-security-alerts}"
+  for fn in notify-alert block-ip revoke-credentials isolate-instance dispatcher; do
+    local zip="/tmp/tesis-${fn}.zip"
+    python3 -c "
+import zipfile
+z = zipfile.ZipFile('${zip}', 'w', __import__('zipfile').ZIP_DEFLATED)
+z.write('lambdas/${fn}/handler.py', 'handler.py')
+z.close()
+"
+    if awslocal lambda get-function --function-name "tesis-${fn}" > /dev/null 2>&1; then
+      awslocal lambda update-function-code \
+        --function-name "tesis-${fn}" --zip-file "fileb://${zip}" > /dev/null
+    else
+      awslocal lambda create-function \
+        --function-name "tesis-${fn}" --runtime python3.12 --role "$ROLE" \
+        --handler handler.lambda_handler --zip-file "fileb://${zip}" \
+        --timeout 30 --environment "$ENV_VARS" > /dev/null
+    fi
+  done
+  echo -e "${C_OK}[preflight] Lambdas OK (notify-alert, block-ip, revoke-credentials, isolate-instance, dispatcher)${NC}"
+
+  # 4. Event source mapping dispatcher → SQS
+  local QUEUE_ARN="arn:aws:sqs:us-east-1:000000000000:tesis-incident-queue"
+  local mapping_count
+  mapping_count=$(awslocal lambda list-event-source-mappings \
+    --function-name tesis-dispatcher \
+    --query 'length(EventSourceMappings)' --output text 2>/dev/null || echo "0")
+  if [ "$mapping_count" = "0" ] || [ -z "$mapping_count" ]; then
+    awslocal lambda create-event-source-mapping \
+      --function-name tesis-dispatcher \
+      --event-source-arn "$QUEUE_ARN" \
+      --batch-size 1 --enabled > /dev/null
+  fi
+  echo -e "${C_OK}[preflight] Event source mapping SQS→dispatcher OK${NC}"
+  echo ""
+}
+_preflight
+
 AWSL="awslocal"
 BUCKET="tesis-security-logs"
 QUEUE_URL="http://localhost:4566/000000000000/tesis-incident-queue"
