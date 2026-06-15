@@ -90,12 +90,20 @@ output "playbook_block_ip_lambda_name" {
   value = aws_lambda_function.playbook_block_ip.function_name
 }
 
+output "playbook_revoke_credentials_lambda_name" {
+  value = aws_lambda_function.playbook_revoke_credentials.function_name
+}
+
 output "playbook_notify_queue_url" {
   value = aws_sqs_queue.playbook_notify_queue.url
 }
 
 output "playbook_block_ip_queue_url" {
   value = aws_sqs_queue.playbook_block_ip_queue.url
+}
+
+output "playbook_revoke_credentials_queue_url" {
+  value = aws_sqs_queue.playbook_revoke_credentials_queue.url
 }
 
 output "mitigation_network_acl_id" {

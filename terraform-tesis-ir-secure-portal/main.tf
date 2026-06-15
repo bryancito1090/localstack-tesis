@@ -976,6 +976,19 @@ resource "aws_sqs_queue" "playbook_block_ip_queue" {
   }
 }
 
+resource "aws_sqs_queue" "playbook_revoke_credentials_queue" {
+  name                       = "${var.project_name}-playbook-revoke-credentials-queue"
+  message_retention_seconds  = 345600
+  visibility_timeout_seconds = 60
+  sqs_managed_sse_enabled    = true
+
+  tags = {
+    Name = "${var.project_name}-playbook-revoke-credentials-queue"
+    Role = "playbook-dispatch-revoke-credentials"
+  }
+}
+
+
 # -----------------------------------------------------------------------------
 # IAM policy crítica de prueba e IAM user de laboratorio.
 # No se crean access keys ni password de consola.
@@ -1090,7 +1103,8 @@ resource "aws_iam_role_policy" "lambda_detector" {
         Resource = [
           aws_sqs_queue.incident_queue.arn,
           aws_sqs_queue.playbook_notify_queue.arn,
-          aws_sqs_queue.playbook_block_ip_queue.arn
+          aws_sqs_queue.playbook_block_ip_queue.arn,
+          aws_sqs_queue.playbook_revoke_credentials_queue.arn
         ]
       },
       {
@@ -1130,6 +1144,7 @@ resource "aws_lambda_function" "detector" {
       INCIDENT_QUEUE_URL        = aws_sqs_queue.incident_queue.url
       PLAYBOOK_NOTIFY_QUEUE_URL = aws_sqs_queue.playbook_notify_queue.url
       PLAYBOOK_BLOCK_IP_QUEUE_URL = aws_sqs_queue.playbook_block_ip_queue.url
+      PLAYBOOK_REVOKE_CREDENTIALS_QUEUE_URL = aws_sqs_queue.playbook_revoke_credentials_queue.url
       VPC_ID                    = aws_vpc.this.id
       PORTAL_INSTANCE_ID        = aws_instance.portal.id
     }
@@ -1426,6 +1441,127 @@ resource "aws_lambda_event_source_mapping" "playbook_notify_from_queue" {
 resource "aws_lambda_event_source_mapping" "playbook_block_ip_from_queue" {
   event_source_arn = aws_sqs_queue.playbook_block_ip_queue.arn
   function_name    = aws_lambda_function.playbook_block_ip.arn
+  batch_size       = 1
+  enabled          = true
+}
+
+# -----------------------------------------------------------------------------
+# Playbook de respuesta para Incidente 3 y 4: PRIVILEGE_ESCALATION y CREDENTIAL_LEAK.
+# revoke-credentials desactiva las access keys del usuario y le aplica Deny-All.
+# -----------------------------------------------------------------------------
+
+data "archive_file" "revoke_credentials_zip" {
+  type        = "zip"
+  source_file = "${path.module}/playbooks/revoke_credentials/handler.py"
+  output_path = "${path.module}/lambda_playbook_revoke_credentials.zip"
+}
+
+resource "aws_cloudwatch_log_group" "playbook_revoke_credentials" {
+  name              = "/aws/lambda/lambda-${var.project_name}-playbook-revoke-credentials"
+  retention_in_days = var.cloudwatch_retention_days
+}
+
+resource "aws_iam_role" "playbook_revoke_credentials" {
+  name = "role-lambda-${var.project_name}-playbook-revoke-credentials"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = { Service = "lambda.amazonaws.com" }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "playbook_revoke_credentials_basic" {
+  role       = aws_iam_role.playbook_revoke_credentials.name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_iam_role_policy" "playbook_revoke_credentials" {
+  name = "policy-lambda-${var.project_name}-playbook-revoke-credentials"
+  role = aws_iam_role.playbook_revoke_credentials.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "ReadDedicatedQueue"
+        Effect = "Allow"
+        Action = [
+          "sqs:ReceiveMessage",
+          "sqs:DeleteMessage",
+          "sqs:GetQueueAttributes"
+        ]
+        Resource = aws_sqs_queue.playbook_revoke_credentials_queue.arn
+      },
+      {
+        Sid    = "ManageUserCredentialsAndPolicies"
+        Effect = "Allow"
+        Action = [
+          "iam:ListAccessKeys",
+          "iam:UpdateAccessKey",
+          "iam:PutUserPolicy"
+        ]
+        Resource = "*"
+      },
+      {
+        Sid    = "WriteRevokeAudit"
+        Effect = "Allow"
+        Action = [
+          "s3:GetObject",
+          "s3:PutObject"
+        ]
+        Resource = "${aws_s3_bucket.evidence.arn}/responses/revoke-credentials/*"
+      },
+      {
+        Sid      = "PublishAlert"
+        Effect   = "Allow"
+        Action   = "sns:Publish"
+        Resource = aws_sns_topic.alerts.arn
+      }
+    ]
+  })
+}
+
+resource "aws_lambda_function" "playbook_revoke_credentials" {
+  function_name = "lambda-${var.project_name}-playbook-revoke-credentials"
+  role          = aws_iam_role.playbook_revoke_credentials.arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.12"
+  architectures = ["x86_64"]
+  memory_size   = 128
+  timeout       = 30
+
+  filename         = data.archive_file.revoke_credentials_zip.output_path
+  source_code_hash = data.archive_file.revoke_credentials_zip.output_base64sha256
+
+  environment {
+    variables = {
+      SNS_ALERTS_ARN  = aws_sns_topic.alerts.arn
+      EVIDENCE_BUCKET = aws_s3_bucket.evidence.bucket
+      RESPONSE_PREFIX = "responses/revoke-credentials"
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.playbook_revoke_credentials_basic,
+    aws_iam_role_policy.playbook_revoke_credentials,
+    aws_cloudwatch_log_group.playbook_revoke_credentials
+  ]
+
+  tags = {
+    Name = "lambda-${var.project_name}-playbook-revoke-credentials"
+    Role = "playbook-revoke-credentials"
+  }
+}
+
+resource "aws_lambda_event_source_mapping" "playbook_revoke_credentials_from_queue" {
+  event_source_arn = aws_sqs_queue.playbook_revoke_credentials_queue.arn
+  function_name    = aws_lambda_function.playbook_revoke_credentials.arn
   batch_size       = 1
   enabled          = true
 }

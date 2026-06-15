@@ -29,6 +29,7 @@ VPC_ID = os.environ.get("VPC_ID", "unknown-vpc")
 PORTAL_INSTANCE_ID = os.environ.get("PORTAL_INSTANCE_ID", "unknown-instance")
 PLAYBOOK_NOTIFY_QUEUE_URL = os.environ.get("PLAYBOOK_NOTIFY_QUEUE_URL", "")
 PLAYBOOK_BLOCK_IP_QUEUE_URL = os.environ.get("PLAYBOOK_BLOCK_IP_QUEUE_URL", "")
+PLAYBOOK_REVOKE_CREDENTIALS_QUEUE_URL = os.environ.get("PLAYBOOK_REVOKE_CREDENTIALS_QUEUE_URL", "")
 ECUADOR_TZ = ZoneInfo("America/Guayaquil")
 
 incidents_table = dynamodb.Table(INCIDENTS_TABLE)
@@ -195,7 +196,10 @@ def build_evidence_key(incident_type: str, incident_id: str) -> str:
 def send_sqs_message(queue_url: str, payload: dict) -> None:
     if not queue_url:
         return
-    sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps(payload, default=decimal_default))
+    try:
+        sqs.send_message(QueueUrl=queue_url, MessageBody=json.dumps(payload, default=decimal_default))
+    except Exception as e:
+        print(f"[ERROR] Failed to send message to SQS queue {queue_url}: {e}")
 
 
 def publish_incident_queue(payload: dict) -> None:
@@ -209,10 +213,17 @@ def publish_incident_queue(payload: dict) -> None:
     # Incidentes con respuesta automatica activa:
     #   BRUTE_FORCE → notify-alert + block-ip  (Incidente 1)
     #   PORT_SCAN   → notify-alert + block-ip  (Incidente 2)
+    #   PRIVILEGE_ESCALATION → notify-alert + revoke-credentials (Incidente 3)
+    #   CREDENTIAL_LEAK      → notify-alert + revoke-credentials (Incidente 4)
     PLAYBOOK_INCIDENTS = {"BRUTE_FORCE", "PORT_SCAN"}
     if payload.get("incident_type") in PLAYBOOK_INCIDENTS:
         send_sqs_message(PLAYBOOK_NOTIFY_QUEUE_URL, payload)
         send_sqs_message(PLAYBOOK_BLOCK_IP_QUEUE_URL, payload)
+
+    REVOKE_INCIDENTS = {"PRIVILEGE_ESCALATION", "CREDENTIAL_LEAK"}
+    if payload.get("incident_type") in REVOKE_INCIDENTS:
+        send_sqs_message(PLAYBOOK_NOTIFY_QUEUE_URL, payload)
+        send_sqs_message(PLAYBOOK_REVOKE_CREDENTIALS_QUEUE_URL, payload)
 
 
 def save_incident(payload: dict, source: str, raw_event: dict, summary: str) -> str:
@@ -231,6 +242,8 @@ def save_incident(payload: dict, source: str, raw_event: dict, summary: str) -> 
     # Registrar qué playbooks se activan para este incidente
     if final_payload.get("incident_type") in {"BRUTE_FORCE", "PORT_SCAN"}:
         final_payload["playbooks_requested"] = ["notify-alert", "block-ip"]
+    elif final_payload.get("incident_type") in {"PRIVILEGE_ESCALATION", "CREDENTIAL_LEAK"}:
+        final_payload["playbooks_requested"] = ["notify-alert", "revoke-credentials"]
 
     evidence_doc = {
         "incident_id": incident_id,
