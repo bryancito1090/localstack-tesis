@@ -164,11 +164,27 @@ def lambda_handler(event, context):
         )
 
         # ── 6. Notificar al equipo vía SNS ───────────────────────────────────
-        subject = f"[{entry['severity']}] Playbook revoke-credentials: {status} {username}"
+        subject = f"[{entry['severity']}] Mitigacion: Credenciales {username} {status}"
+        mitigation_report = f"""
+[MITIGACION DE SEGURIDAD AWS] - ACCION: {status}
+==================================================
+Playbook          : revoke-credentials
+Tipo de Incidente : {incident_type}
+ID de Incidente   : {incident_id}
+Estado            : {status}
+--------------------------------------------------
+Usuario IAM       : {username}
+Acciones Tomadas  : {', '.join(actions_taken)}
+DenyAll Aplicado  : {'SI' if enforcement.get('deny_all_applied') else 'NO'}
+--------------------------------------------------
+Hora Mitigacion   : {timestamp}
+Evidencia S3      : {key}
+==================================================
+""".strip()
         sns.publish(
             TopicArn=SNS_ARN,
             Subject=subject[:100],
-            Message=json.dumps(entry, indent=2, ensure_ascii=False),
+            Message=mitigation_report,
         )
 
         print(f"[revoke-credentials] {incident_type} → {status} para {username}. evidence={key}")

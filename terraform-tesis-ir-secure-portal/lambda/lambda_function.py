@@ -286,12 +286,6 @@ def save_incident(payload: dict, source: str, raw_event: dict, summary: str) -> 
 
     publish_incident_queue(final_payload)
 
-    sns.publish(
-        TopicArn=SNS_TOPIC_ARN,
-        Subject=f"[{final_payload['severity']}] Incidente detectado: {final_payload['incident_type']}",
-        Message=json.dumps(evidence_doc, indent=2, default=decimal_default),
-    )
-
     cloudwatch.put_metric_data(
         Namespace="TesisIR",
         MetricData=[
