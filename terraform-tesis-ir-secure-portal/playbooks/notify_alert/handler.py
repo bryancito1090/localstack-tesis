@@ -1,14 +1,8 @@
 """
 Playbook: notify-alert
-Recibe incidentes desde una cola SQS dedicada y publica una notificacion
-estructurada en SNS. Tambien deja evidencia operativa en S3.
-
-Incidentes soportados:
-  - BRUTE_FORCE       (severity HIGH)  → Componente C, Incidente 1
-  - PORT_SCAN         (severity MEDIUM) → Componente C, Incidente 2
-  - PRIVILEGE_ESCALATION (severity CRITICAL)
-  - CREDENTIAL_LEAK   (severity CRITICAL)
-  - EXFILTRATION      (severity HIGH)
+Recibe incidentes desde una cola SQS dedicada, genera un reporte profesional
+de seguridad para el SOC y lo publica al topico SNS (para entrega simultanea
+y formateada en Gmail y Telegram). Tambien registra evidencia en S3.
 """
 import json
 import os
@@ -26,8 +20,6 @@ EVIDENCE_BUCKET = os.environ["EVIDENCE_BUCKET"]
 RESPONSE_PREFIX = os.environ.get("RESPONSE_PREFIX", "responses/notify-alert")
 EC_TZ           = ZoneInfo("America/Guayaquil")
 
-# Tipos de incidente que este playbook debe procesar.
-# Cualquier otro tipo se omite (skip) para evitar procesamiento no intencionado.
 SUPPORTED_INCIDENT_TYPES = {
     "BRUTE_FORCE",
     "PORT_SCAN",
@@ -39,6 +31,43 @@ SUPPORTED_INCIDENT_TYPES = {
 
 def now_ecuador() -> str:
     return datetime.now(EC_TZ).isoformat()
+
+
+def format_incident_report(alert: dict) -> str:
+    """Genera un reporte profesional de seguridad (SOC) en texto plano para correo y Telegram."""
+    incident_type = alert.get("incident_type", "NO_ESPECIFICADO")
+    severity      = alert.get("severity", "MEDIUM")
+    status        = alert.get("status", "NOTIFICADO")
+    incident_id   = alert.get("incident_id", "N/A")
+    source_ip     = alert.get("sourceIPAddress", "N/A")
+    resource      = alert.get("affectedResource", "N/A")
+    service       = alert.get("affected_service", "N/A")
+    asset         = alert.get("asset_name", "N/A")
+    basis         = alert.get("severity_basis", "N/A")
+    detected_at   = alert.get("detectedAt", "N/A")
+    responded_at  = alert.get("respondedAt", "N/A")
+    s3_key        = alert.get("s3_log_key", "N/A")
+
+    lines = [
+        f"[ALERTA DE SEGURIDAD AWS] - SEVERIDAD: {severity}",
+        "=" * 50,
+        f"Tipo de Incidente : {incident_type}",
+        f"ID de Incidente   : {incident_id}",
+        f"Estado            : {status}",
+        f"Playbook          : notify-alert",
+        "-" * 50,
+        f"IP Origen         : {source_ip}",
+        f"Recurso Afectado  : {resource}",
+        f"Servicio Afectado : {service}",
+        f"Activo Objetivo   : {asset}",
+        "-" * 50,
+        f"Criterio / Motivo : {basis}",
+        f"Hora Deteccion    : {detected_at}",
+        f"Hora Respuesta    : {responded_at}",
+        f"Evidencia S3      : {s3_key}",
+        "=" * 50,
+    ]
+    return "\n".join(lines)
 
 
 def lambda_handler(event, context):
@@ -78,17 +107,7 @@ def lambda_handler(event, context):
             "incident_id":      body.get("incident_id", ""),
         }
 
-        # Campos extra según el tipo de incidente
-        if incident_type == "PORT_SCAN":
-            alert["scanned_ports_count"]   = body.get("scanned_ports_count",
-                                                       body.get("event_count", 0))
-            alert["rejected_connections"]  = body.get("rejected_connections", 0)
-        elif incident_type == "BRUTE_FORCE":
-            alert["failed_attempts"]       = body.get("failed_attempts",
-                                                       body.get("event_count", 0))
-            alert["detection_window"]      = body.get("detection_window", "5 minutes")
-
-        # ── Guardar evidencia en S3 ────────────────────────────────────────
+        # ── Guardar evidencia JSON en S3 ───────────────────────────────────
         key = f"{RESPONSE_PREFIX}/{body.get('incident_id') or uuid.uuid4().hex}.json"
         s3.put_object(
             Bucket=EVIDENCE_BUCKET,
@@ -97,15 +116,17 @@ def lambda_handler(event, context):
             ContentType="application/json",
         )
 
-        # ── Publicar en SNS ────────────────────────────────────────────────
-        subject = f"[{alert['severity']}] Playbook notify-alert: {incident_type}"
+        # ── Publicar reporte legible en SNS (llega formateado a Gmail y Telegram)
+        subject = f"[{alert['severity']}] Incidente: {incident_type} ({alert['affectedResource']})"
+        report_text = format_incident_report(alert)
+
         sns.publish(
             TopicArn=SNS_ARN,
             Subject=subject[:100],
-            Message=json.dumps(alert, indent=2, ensure_ascii=False),
+            Message=report_text,
         )
 
-        print(f"[notify-alert] {incident_type} notificado. evidence_key={key}")
+        print(f"[notify-alert] {incident_type} notificado profesionalmente. evidence_key={key}")
         results.append({"status": "success", "action": "sns_published", "evidence_key": key})
 
     return {

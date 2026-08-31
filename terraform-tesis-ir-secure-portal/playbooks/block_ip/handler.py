@@ -212,11 +212,27 @@ def lambda_handler(event, context):
         )
 
         # ── Notificar al equipo via SNS ────────────────────────────────────
-        subject = f"[{entry['severity']}] Playbook block-ip: {status} {ip_value} ({incident_type})"
+        subject = f"[{entry['severity']}] Mitigacion: IP {ip_value} {status} en NACL"
+        mitigation_report = f"""
+[MITIGACION DE SEGURIDAD AWS] - ACCION: {status}
+==================================================
+Playbook          : block-ip
+Tipo de Incidente : {incident_type}
+ID de Incidente   : {entry['incident_id']}
+Estado            : {status}
+--------------------------------------------------
+IP Objetivo       : {ip_value}
+Network ACL       : {enforcement.get('network_acl_id', 'N/A')}
+Regla Creada      : #{enforcement.get('rule_number', 'N/A')}
+--------------------------------------------------
+Hora Mitigacion   : {timestamp}
+Evidencia S3      : {key}
+==================================================
+""".strip()
         sns.publish(
             TopicArn=SNS_ARN,
             Subject=subject[:100],
-            Message=json.dumps(entry, indent=2, ensure_ascii=False),
+            Message=mitigation_report,
         )
 
         print(f"[block-ip] {incident_type} → {status} para {ip_value}. "

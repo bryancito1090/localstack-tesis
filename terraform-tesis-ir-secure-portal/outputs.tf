@@ -109,3 +109,9 @@ output "playbook_revoke_credentials_queue_url" {
 output "mitigation_network_acl_id" {
   value = aws_vpc.this.default_network_acl_id
 }
+
+output "telegram_notifier_lambda_name" {
+  value       = try(aws_lambda_function.telegram_notifier[0].function_name, "disabled")
+  description = "Nombre de la Lambda de Telegram (si esta habilitada)."
+}
+

@@ -212,3 +212,17 @@ variable "threshold_s3_getobject_exfiltration_count_1h" {
   type        = number
   default     = 50
 }
+
+variable "telegram_bot_token" {
+  description = "Token del Bot de Telegram para envio de alertas. Opcional; si queda vacio no se despliega la integracion."
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "telegram_chat_id" {
+  description = "Chat ID o ID de grupo/canal de Telegram donde se enviaran las alertas."
+  type        = string
+  default     = ""
+}
+

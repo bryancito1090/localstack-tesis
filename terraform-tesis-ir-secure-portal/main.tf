@@ -1567,6 +1567,97 @@ resource "aws_lambda_event_source_mapping" "playbook_revoke_credentials_from_que
 }
 
 # -----------------------------------------------------------------------------
+# Integracion de notificaciones a Telegram via SNS
+# -----------------------------------------------------------------------------
+
+data "archive_file" "telegram_notifier_zip" {
+  count       = var.telegram_bot_token != "" && var.telegram_chat_id != "" ? 1 : 0
+  type        = "zip"
+  source_file = "${path.module}/playbooks/telegram_notifier/handler.py"
+  output_path = "${path.module}/lambda_playbook_telegram_notifier.zip"
+}
+
+resource "aws_cloudwatch_log_group" "telegram_notifier" {
+  count             = var.telegram_bot_token != "" && var.telegram_chat_id != "" ? 1 : 0
+  name              = "/aws/lambda/lambda-${var.project_name}-telegram-notifier"
+  retention_in_days = var.cloudwatch_retention_days
+}
+
+resource "aws_iam_role" "telegram_notifier" {
+  count = var.telegram_bot_token != "" && var.telegram_chat_id != "" ? 1 : 0
+  name  = "role-lambda-${var.project_name}-telegram-notifier"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect    = "Allow"
+        Principal = { Service = "lambda.amazonaws.com" }
+        Action    = "sts:AssumeRole"
+      }
+    ]
+  })
+}
+
+resource "aws_iam_role_policy_attachment" "telegram_notifier_basic" {
+  count      = var.telegram_bot_token != "" && var.telegram_chat_id != "" ? 1 : 0
+  role       = aws_iam_role.telegram_notifier[0].name
+  policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
+}
+
+resource "aws_lambda_function" "telegram_notifier" {
+  count         = var.telegram_bot_token != "" && var.telegram_chat_id != "" ? 1 : 0
+  function_name = "lambda-${var.project_name}-telegram-notifier"
+  role          = aws_iam_role.telegram_notifier[0].arn
+  handler       = "handler.lambda_handler"
+  runtime       = "python3.12"
+  architectures = ["x86_64"]
+  memory_size   = 128
+  timeout       = 15
+
+  filename         = data.archive_file.telegram_notifier_zip[0].output_path
+  source_code_hash = data.archive_file.telegram_notifier_zip[0].output_base64sha256
+
+  environment {
+    variables = {
+      TELEGRAM_BOT_TOKEN = var.telegram_bot_token
+      TELEGRAM_CHAT_ID   = var.telegram_chat_id
+    }
+  }
+
+  depends_on = [
+    aws_iam_role_policy_attachment.telegram_notifier_basic,
+    aws_cloudwatch_log_group.telegram_notifier
+  ]
+
+  tags = {
+    Name = "lambda-${var.project_name}-telegram-notifier"
+    Role = "telegram-alert-notifier"
+  }
+}
+
+resource "aws_lambda_permission" "from_sns_telegram" {
+  count         = var.telegram_bot_token != "" && var.telegram_chat_id != "" ? 1 : 0
+  statement_id  = "AllowExecutionFromSNS"
+  action        = "lambda:InvokeFunction"
+  function_name = aws_lambda_function.telegram_notifier[0].function_name
+  principal     = "sns.amazonaws.com"
+  source_arn    = aws_sns_topic.alerts.arn
+}
+
+resource "aws_sns_topic_subscription" "telegram" {
+  count     = var.telegram_bot_token != "" && var.telegram_chat_id != "" ? 1 : 0
+  topic_arn = aws_sns_topic.alerts.arn
+  protocol  = "lambda"
+  endpoint  = aws_lambda_function.telegram_notifier[0].arn
+
+  depends_on = [
+    aws_lambda_permission.from_sns_telegram
+  ]
+}
+
+
+# -----------------------------------------------------------------------------
 # Metric filters y alarmas simples de respaldo.
 # -----------------------------------------------------------------------------
 
@@ -1635,7 +1726,6 @@ resource "aws_cloudwatch_metric_alarm" "console_login_failure" {
   threshold           = var.threshold_console_login_failures_same_user_5m
   alarm_description   = "Alarma por multiples fallos de inicio de sesion"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
 
   depends_on = [aws_cloudwatch_log_metric_filter.console_login_failure]
 }
@@ -1651,7 +1741,6 @@ resource "aws_cloudwatch_metric_alarm" "iam_critical_action" {
   threshold           = 1
   alarm_description   = "Alarma por accion critica IAM"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
 
   depends_on = [aws_cloudwatch_log_metric_filter.iam_critical_action]
 }
@@ -1667,7 +1756,6 @@ resource "aws_cloudwatch_metric_alarm" "iam_policy_change" {
   threshold           = 1
   alarm_description   = "Alarma por cambio de politica IAM"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
 
   depends_on = [aws_cloudwatch_log_metric_filter.iam_policy_change]
 }
@@ -1685,7 +1773,6 @@ resource "aws_cloudwatch_metric_alarm" "vpc_rejected_traffic" {
   threshold           = var.threshold_port_scan_distinct_ports_5m
   alarm_description   = "Alarma por trafico rechazado repetido hacia la EC2"
   treat_missing_data  = "notBreaching"
-  alarm_actions       = [aws_sns_topic.alerts.arn]
 
   depends_on = [aws_cloudwatch_log_metric_filter.vpc_rejected_traffic]
 }

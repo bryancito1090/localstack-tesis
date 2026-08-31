@@ -19,6 +19,11 @@ authorized_ip_cidrs = []
 # Opcional: correo para SNS y Budget. Debes confirmar la suscripcion SNS por email.
 alert_email = "tu_correo@ejemplo.com"
 
+# Opcional: Notificaciones a Telegram
+# Obtén el token con @BotFather y el chat_id con @userinfobot o @RawDataBot
+telegram_bot_token = ""
+telegram_chat_id   = ""
+
 # Si ya tienes una key pair EC2 creada en esa region:
 # key_name = "tesis-ir-key"
 key_name = ""
