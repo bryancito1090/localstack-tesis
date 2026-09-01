@@ -1,0 +1,55 @@
+# Copia este archivo como terraform.tfvars y edita los valores.
+
+aws_region   = "ca-central-1"
+project_name = "tesis-ir"
+
+# Obligatorio: coloca TU IP publica con /32.
+# Puedes verla buscando "what is my ip".
+ssh_allowed_cidr = "181.000.000.000/32"
+
+# Recomendado: restringir HTTP tambien a tu IP /32.
+# Si dejas [] Terraform usara automaticamente ssh_allowed_cidr.
+# Solo para exposiciones publicas temporales usa ["0.0.0.0/0"].
+http_allowed_cidrs = []
+
+# IPs consideradas normales/autorizadas por Lambda Detector B.
+# Si queda vacio, se usa ssh_allowed_cidr.
+authorized_ip_cidrs = []
+
+# Opcional: correo para SNS y Budget. Debes confirmar la suscripcion SNS por email.
+alert_email = "tu_correo@ejemplo.com"
+
+# Subdominio para firma digital DKIM en Amazon SES (opcional)
+ses_domain       = "soc.tudominio.com"
+ses_sender_email = "alertas@soc.tudominio.com"
+
+# Opcional: Notificaciones a Telegram
+# Obtén el token con @BotFather y el chat_id con @userinfobot o @RawDataBot
+telegram_bot_token = ""
+telegram_chat_id   = ""
+
+# Si ya tienes una key pair EC2 creada en esa region:
+# key_name = "tesis-ir-key"
+key_name = ""
+
+# Mantener bajo costo:
+enable_vpc_flow_logs    = true
+enable_s3_data_events   = false
+enable_aws_config       = false
+cloudtrail_multi_region = false
+
+# Activa estos SOLO cuando vayas a probar esos incidentes:
+# enable_s3_data_events = true   # para EXFILTRATION con S3 GetObject
+# enable_aws_config     = true   # para evidencia adicional de cambios IAM/configuracion
+
+ec2_instance_type = "t3.micro"
+ec2_volume_size_gb = 8
+cloudwatch_retention_days = 14
+monthly_budget_limit_usd = 5
+
+# Umbrales alineados con Variables_Incidentes.docx
+threshold_app_login_failures_same_ip_5m       = 5
+threshold_console_login_failures_same_user_5m = 5
+threshold_console_login_failures_same_ip_5m   = 10
+threshold_port_scan_distinct_ports_5m         = 10
+threshold_s3_getobject_exfiltration_count_1h  = 50
