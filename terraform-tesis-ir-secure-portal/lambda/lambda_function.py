@@ -207,22 +207,30 @@ def publish_incident_queue(payload: dict) -> None:
     send_sqs_message(INCIDENT_QUEUE_URL, payload)
 
     # Fan-out controlado a playbooks de respuesta automatica.
-    # Se usan colas dedicadas para que notify-alert y block-ip reciban ambos
-    # el mismo evento sin competir por el mensaje SQS.
+    # Se usan colas dedicadas para que notify-alert y los playbooks de contencion
+    # reciban ambos el mismo evento sin competir por el mensaje SQS.
     #
-    # Incidentes con respuesta automatica activa:
-    #   BRUTE_FORCE → notify-alert + block-ip  (Incidente 1)
-    #   PORT_SCAN   → notify-alert + block-ip  (Incidente 2)
-    #   PRIVILEGE_ESCALATION → notify-alert + revoke-credentials (Incidente 3)
-    #   CREDENTIAL_LEAK      → notify-alert + revoke-credentials (Incidente 4)
-    PLAYBOOK_INCIDENTS = {"BRUTE_FORCE", "PORT_SCAN"}
-    if payload.get("incident_type") in PLAYBOOK_INCIDENTS:
+    # Cobertura completa de incidentes:
+    #   1. BRUTE_FORCE          → notify-alert + block-ip
+    #   2. PORT_SCAN            → notify-alert + block-ip
+    #   3. PRIVILEGE_ESCALATION → notify-alert + revoke-credentials
+    #   4. CREDENTIAL_LEAK      → notify-alert + revoke-credentials
+    #   5. EXFILTRATION         → notify-alert
+    incident_type = payload.get("incident_type")
+
+    # notify-alert se activa para TODOS los incidentes soportados
+    NOTIFY_INCIDENTS = {"BRUTE_FORCE", "PORT_SCAN", "PRIVILEGE_ESCALATION", "CREDENTIAL_LEAK", "EXFILTRATION"}
+    if incident_type in NOTIFY_INCIDENTS:
         send_sqs_message(PLAYBOOK_NOTIFY_QUEUE_URL, payload)
+
+    # block-ip se activa para incidentes de red (contención perimetral)
+    BLOCK_IP_INCIDENTS = {"BRUTE_FORCE", "PORT_SCAN"}
+    if incident_type in BLOCK_IP_INCIDENTS:
         send_sqs_message(PLAYBOOK_BLOCK_IP_QUEUE_URL, payload)
 
+    # revoke-credentials se activa para incidentes de credenciales/IAM (contención de identidad)
     REVOKE_INCIDENTS = {"PRIVILEGE_ESCALATION", "CREDENTIAL_LEAK"}
-    if payload.get("incident_type") in REVOKE_INCIDENTS:
-        send_sqs_message(PLAYBOOK_NOTIFY_QUEUE_URL, payload)
+    if incident_type in REVOKE_INCIDENTS:
         send_sqs_message(PLAYBOOK_REVOKE_CREDENTIALS_QUEUE_URL, payload)
 
 
@@ -244,6 +252,8 @@ def save_incident(payload: dict, source: str, raw_event: dict, summary: str) -> 
         final_payload["playbooks_requested"] = ["notify-alert", "block-ip"]
     elif final_payload.get("incident_type") in {"PRIVILEGE_ESCALATION", "CREDENTIAL_LEAK"}:
         final_payload["playbooks_requested"] = ["notify-alert", "revoke-credentials"]
+    elif final_payload.get("incident_type") == "EXFILTRATION":
+        final_payload["playbooks_requested"] = ["notify-alert"]
 
     evidence_doc = {
         "incident_id": incident_id,
@@ -312,8 +322,8 @@ def analyze_app_event(event_json: dict, config: dict):
 
     if count >= threshold and mark_alert_once(f"BRUTE_FORCE#APP#{source_ip}#{window}"):
         severity_basis = (
-            f"HIGH porque la IP {source_ip} alcanzo {count} intentos fallidos "
-            f"en 5 minutos; el umbral configurado para BRUTE_FORCE es {threshold}."
+            f"HIGH: La IP {source_ip} alcanzó {count} intentos fallidos de autenticación "
+            f"en 5 minutos (umbral={threshold})."
         )
         payload = {
             "incident_type": "BRUTE_FORCE",
@@ -327,9 +337,9 @@ def analyze_app_event(event_json: dict, config: dict):
             "event_count": count,
             "failed_attempts": count,
             "detection_window": "5 minutes",
-            "affected_service": event_json.get("affected_service", "Portal de autenticacion corporativo"),
-            "asset_name": event_json.get("asset_name", f"{PORTAL_INSTANCE_ID}"),
-            "asset_type": event_json.get("asset_type", "EC2 web application"),
+            "affected_service": event_json.get("affected_service", "Portal Web Corporativo"),
+            "asset_name": event_json.get("asset_name", f"EC2 Instance ({PORTAL_INSTANCE_ID})"),
+            "asset_type": event_json.get("asset_type", "EC2 Web Application"),
             "severity_basis": severity_basis,
             "mitigation_playbooks": ["notify-alert", "block-ip"],
         }
@@ -362,14 +372,16 @@ def analyze_cloudtrail(event_json: dict, config: dict):
                     "sourceIPAddress": source_ip,
                     "affectedResource": affected_iam_user(event_json, username),
                     "s3_log_key": "pending",
-                    "timestamp": event_json.get("eventTime", utc_now()),
+                    "timestamp": event_json.get("eventTime", ecuador_now()),
+                    "timestamp_utc": event_json.get("eventTime", utc_now()),
+                    "timezone": "America/Guayaquil",
                     "event_count": count_user,
                     "failed_attempts": count_user,
                     "detection_window": "5 minutes",
-                    "affected_service": "AWS Sign-In / IAM",
-                    "asset_name": "AWS Console",
-                    "asset_type": "AWS control plane",
-                    "severity_basis": f"HIGH porque se alcanzaron {count_user} fallos de ConsoleLogin para el mismo usuario en 5 minutos.",
+                    "affected_service": "AWS Sign-In / IAM Console",
+                    "asset_name": f"IAM User ({username})",
+                    "asset_type": "AWS Control Plane",
+                    "severity_basis": f"HIGH: Se alcanzaron {count_user} fallos de ConsoleLogin para {username} en 5 minutos (umbral={threshold_user}).",
                     "mitigation_playbooks": ["notify-alert", "block-ip"],
                 }
                 return payload, f"{count_user} fallos de ConsoleLogin para {username} en 5 minutos."
@@ -380,14 +392,16 @@ def analyze_cloudtrail(event_json: dict, config: dict):
                     "sourceIPAddress": source_ip,
                     "affectedResource": affected_iam_user(event_json, username),
                     "s3_log_key": "pending",
-                    "timestamp": event_json.get("eventTime", utc_now()),
+                    "timestamp": event_json.get("eventTime", ecuador_now()),
+                    "timestamp_utc": event_json.get("eventTime", utc_now()),
+                    "timezone": "America/Guayaquil",
                     "event_count": count_ip,
                     "failed_attempts": count_ip,
                     "detection_window": "5 minutes",
-                    "affected_service": "AWS Sign-In / IAM",
-                    "asset_name": "AWS Console",
-                    "asset_type": "AWS control plane",
-                    "severity_basis": f"HIGH porque se alcanzaron {count_ip} fallos de ConsoleLogin desde la misma IP en 5 minutos.",
+                    "affected_service": "AWS Sign-In / IAM Console",
+                    "asset_name": f"AWS Console (IP: {source_ip})",
+                    "asset_type": "AWS Control Plane",
+                    "severity_basis": f"HIGH: Se alcanzaron {count_ip} fallos de ConsoleLogin desde {source_ip} en 5 minutos (umbral={threshold_ip}).",
                     "mitigation_playbooks": ["notify-alert", "block-ip"],
                 }
                 return payload, f"{count_ip} fallos de ConsoleLogin desde {source_ip} en 5 minutos."
@@ -409,15 +423,26 @@ def analyze_cloudtrail(event_json: dict, config: dict):
         target_policy_arn = request_params.get("policyArn") or request_params.get("policyDocument", "")
         window = current_window(5)
         count = increment_counter(f"privilege_escalation#{username}#window#{window}", ttl_seconds=900)
+        severity_basis = (
+            f"CRITICAL: Acción IAM crítica '{event_name}' ejecutada por "
+            f"la identidad '{username}' desde {source_ip}."
+        )
         payload = {
             "incident_type": "PRIVILEGE_ESCALATION",
             "severity": "CRITICAL",
             "sourceIPAddress": source_ip,
             "affectedResource": affected_iam_user(event_json, username),
+            "affected_service": "AWS Identity and Access Management (IAM)",
+            "asset_name": f"IAM Principal ({username})",
+            "asset_type": "IAM Identity",
+            "severity_basis": severity_basis,
             "s3_log_key": "pending",
-            "timestamp": event_json.get("eventTime", utc_now()),
+            "timestamp": event_json.get("eventTime", ecuador_now()),
+            "timestamp_utc": event_json.get("eventTime", utc_now()),
+            "timezone": "America/Guayaquil",
             "event_count": count,
             "suspicious_actions": [event_name],
+            "mitigation_playbooks": ["notify-alert", "revoke-credentials"],
         }
         if target_policy_arn:
             payload["target_policy_arn"] = str(target_policy_arn)[:500]
@@ -430,16 +455,27 @@ def analyze_cloudtrail(event_json: dict, config: dict):
     if event_name in credential_leak_events and identity_type in {"IAMUser", "AssumedRole"}:
         if source_ip != "unknown" and not ip_in_cidrs(source_ip, allowed_ips):
             if mark_alert_once(f"CREDENTIAL_LEAK#{username}#{source_ip}#{current_window(5)}", ttl_seconds=900):
+                severity_basis = (
+                    f"CRITICAL: Credenciales de '{username}' utilizadas desde IP no autorizada "
+                    f"{source_ip} (Región: {aws_region}, API: {event_name})."
+                )
                 payload = {
                     "incident_type": "CREDENTIAL_LEAK",
                     "severity": "CRITICAL",
                     "sourceIPAddress": source_ip,
                     "affectedResource": affected_iam_user(event_json, username),
+                    "affected_service": f"AWS IAM / {event_source}",
+                    "asset_name": f"IAM User ({username})",
+                    "asset_type": "IAM Credentials",
+                    "severity_basis": severity_basis,
                     "s3_log_key": "pending",
-                    "timestamp": event_json.get("eventTime", utc_now()),
+                    "timestamp": event_json.get("eventTime", ecuador_now()),
+                    "timestamp_utc": event_json.get("eventTime", utc_now()),
+                    "timezone": "America/Guayaquil",
                     "event_count": 1,
                     "service_accessed": event_source,
                     "unusual_region": aws_region,
+                    "mitigation_playbooks": ["notify-alert", "revoke-credentials"],
                 }
                 return payload, f"Credenciales de {username} usadas desde IP no autorizada {source_ip}."
 
@@ -451,18 +487,29 @@ def analyze_cloudtrail(event_json: dict, config: dict):
         count = increment_counter(f"exfiltration#{source_ip}#{bucket}#window#{window}", ttl_seconds=7200)
         threshold = int(thresholds.get("s3_getobject_exfiltration_count_1h", 50))
         if count >= threshold and mark_alert_once(f"EXFILTRATION#{source_ip}#{bucket}#{window}", ttl_seconds=7200):
+            severity_basis = (
+                f"HIGH: Descarga masiva no autorizada detectada ({count} operaciones GetObject en 1 hora, "
+                f"umbral={threshold}) sobre el bucket '{bucket}' desde {source_ip}."
+            )
             payload = {
                 "incident_type": "EXFILTRATION",
                 "severity": "HIGH",
                 "sourceIPAddress": source_ip,
                 "affectedResource": f"s3:::{bucket}" if bucket else f"ec2:instance/{PORTAL_INSTANCE_ID}",
+                "affected_service": "Amazon Simple Storage Service (S3)",
+                "asset_name": f"S3 Bucket ({bucket})",
+                "asset_type": "Cloud Storage Data",
+                "severity_basis": severity_basis,
                 "s3_log_key": "pending",
-                "timestamp": event_json.get("eventTime", utc_now()),
+                "timestamp": event_json.get("eventTime", ecuador_now()),
+                "timestamp_utc": event_json.get("eventTime", utc_now()),
+                "timezone": "America/Guayaquil",
                 "event_count": count,
                 "total_downloads": count,
                 "affected_bucket": bucket or "unknown",
                 "first_access": "tracked_in_detection_window",
-                "last_access": event_json.get("eventTime", utc_now()),
+                "last_access": event_json.get("eventTime", ecuador_now()),
+                "mitigation_playbooks": ["notify-alert"],
             }
             return payload, f"{count} operaciones GetObject desde {source_ip} sobre bucket {bucket} en 1 hora."
 
@@ -516,16 +563,27 @@ def analyze_flow_log(message: str, config: dict):
     rejected_count = increment_counter(f"portscan_rejects#{srcaddr}#window#{window}", ttl_seconds=900)
 
     if distinct_count >= threshold and mark_alert_once(f"PORT_SCAN#{srcaddr}#{window}"):
+        severity_basis = (
+            f"MEDIUM: La IP {srcaddr} sondeó {distinct_count} puertos distintos "
+            f"con paquetes REJECT en VPC Flow Logs en 5 minutos (umbral={threshold})."
+        )
         payload = {
             "incident_type": "PORT_SCAN",
             "severity": "MEDIUM",
             "sourceIPAddress": srcaddr,
             "affectedResource": f"vpc/{VPC_ID}",
+            "affected_service": "Amazon VPC / Network Security",
+            "asset_name": f"VPC-{VPC_ID} (Portal Instance: {PORTAL_INSTANCE_ID})",
+            "asset_type": "VPC Network Boundary",
+            "severity_basis": severity_basis,
             "s3_log_key": "pending",
-            "timestamp": utc_now(),
+            "timestamp": ecuador_now(),
+            "timestamp_utc": utc_now(),
+            "timezone": "America/Guayaquil",
             "event_count": rejected_count,
             "rejected_connections": rejected_count,
             "scanned_ports_count": distinct_count,
+            "mitigation_playbooks": ["notify-alert", "block-ip"],
         }
         return payload, f"Posible escaneo: {distinct_count} puertos distintos rechazados desde {srcaddr} en 5 minutos.", flow
     return None

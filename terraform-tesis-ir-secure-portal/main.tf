@@ -927,12 +927,32 @@ resource "aws_sns_topic" "alerts" {
   name = "${var.project_name}-incident-alerts"
 }
 
-resource "aws_sns_topic_subscription" "email" {
-  count = var.alert_email != "" ? 1 : 0
+# Suscripcion de correo gestionada directamente via SES HTML Card (evita correos duplicados en texto plano)
+# Si deseas reactivar el correo de texto plano de SNS, descomenta este bloque:
+# resource "aws_sns_topic_subscription" "email" {
+#   count = var.alert_email != "" ? 1 : 0
+#   topic_arn = aws_sns_topic.alerts.arn
+#   protocol  = "email"
+#   endpoint  = var.alert_email
+# }
 
-  topic_arn = aws_sns_topic.alerts.arn
-  protocol  = "email"
-  endpoint  = var.alert_email
+resource "aws_ses_email_identity" "alert" {
+  count = var.alert_email != "" ? 1 : 0
+  email = var.alert_email
+}
+
+# -----------------------------------------------------------------------------
+# Amazon SES: Identidad de Dominio y Firma Digital DKIM (soc.bryan-bano.com)
+# -----------------------------------------------------------------------------
+
+resource "aws_ses_domain_identity" "soc" {
+  count  = var.ses_domain != "" ? 1 : 0
+  domain = var.ses_domain
+}
+
+resource "aws_ses_domain_dkim" "soc" {
+  count  = var.ses_domain != "" ? 1 : 0
+  domain = aws_ses_domain_identity.soc[0].domain
 }
 
 # -----------------------------------------------------------------------------
@@ -1308,6 +1328,15 @@ resource "aws_iam_role_policy" "playbook_notify" {
         Resource = aws_sns_topic.alerts.arn
       },
       {
+        Sid      = "SendSESEmail"
+        Effect   = "Allow"
+        Action   = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
+      },
+      {
         Sid    = "WritePlaybookAudit"
         Effect = "Allow"
         Action = [
@@ -1359,6 +1388,15 @@ resource "aws_iam_role_policy" "playbook_block_ip" {
         Effect   = "Allow"
         Action   = "sns:Publish"
         Resource = aws_sns_topic.alerts.arn
+      },
+      {
+        Sid      = "SendSESEmail"
+        Effect   = "Allow"
+        Action   = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -1378,9 +1416,11 @@ resource "aws_lambda_function" "playbook_notify" {
 
   environment {
     variables = {
-      SNS_ALERTS_ARN = aws_sns_topic.alerts.arn
-      EVIDENCE_BUCKET = aws_s3_bucket.evidence.bucket
-      RESPONSE_PREFIX = "responses/notify-alert"
+      SNS_ALERTS_ARN   = aws_sns_topic.alerts.arn
+      EVIDENCE_BUCKET  = aws_s3_bucket.evidence.bucket
+      RESPONSE_PREFIX  = "responses/notify-alert"
+      ALERT_EMAIL      = var.alert_email
+      SES_SENDER_EMAIL = var.ses_sender_email
     }
   }
 
@@ -1410,12 +1450,14 @@ resource "aws_lambda_function" "playbook_block_ip" {
 
   environment {
     variables = {
-      SNS_ALERTS_ARN = aws_sns_topic.alerts.arn
-      EVIDENCE_BUCKET = aws_s3_bucket.evidence.bucket
-      TARGET_NACL_ID = aws_vpc.this.default_network_acl_id
-      RESPONSE_PREFIX = "responses/block-ip"
-      RULE_MIN = "1"
-      RULE_MAX = "99"
+      SNS_ALERTS_ARN   = aws_sns_topic.alerts.arn
+      EVIDENCE_BUCKET  = aws_s3_bucket.evidence.bucket
+      TARGET_NACL_ID   = aws_vpc.this.default_network_acl_id
+      RESPONSE_PREFIX  = "responses/block-ip"
+      RULE_MIN         = "1"
+      RULE_MAX         = "99"
+      ALERT_EMAIL      = var.alert_email
+      SES_SENDER_EMAIL = var.ses_sender_email
     }
   }
 
@@ -1522,6 +1564,15 @@ resource "aws_iam_role_policy" "playbook_revoke_credentials" {
         Effect   = "Allow"
         Action   = "sns:Publish"
         Resource = aws_sns_topic.alerts.arn
+      },
+      {
+        Sid      = "SendSESEmail"
+        Effect   = "Allow"
+        Action   = [
+          "ses:SendEmail",
+          "ses:SendRawEmail"
+        ]
+        Resource = "*"
       }
     ]
   })
@@ -1541,9 +1592,11 @@ resource "aws_lambda_function" "playbook_revoke_credentials" {
 
   environment {
     variables = {
-      SNS_ALERTS_ARN  = aws_sns_topic.alerts.arn
-      EVIDENCE_BUCKET = aws_s3_bucket.evidence.bucket
-      RESPONSE_PREFIX = "responses/revoke-credentials"
+      SNS_ALERTS_ARN   = aws_sns_topic.alerts.arn
+      EVIDENCE_BUCKET  = aws_s3_bucket.evidence.bucket
+      RESPONSE_PREFIX  = "responses/revoke-credentials"
+      ALERT_EMAIL      = var.alert_email
+      SES_SENDER_EMAIL = var.ses_sender_email
     }
   }
 
@@ -1573,7 +1626,7 @@ resource "aws_lambda_event_source_mapping" "playbook_revoke_credentials_from_que
 data "archive_file" "telegram_notifier_zip" {
   count       = var.telegram_bot_token != "" && var.telegram_chat_id != "" ? 1 : 0
   type        = "zip"
-  source_file = "${path.module}/playbooks/telegram_notifier/handler.py"
+  source_dir  = "${path.module}/playbooks/telegram_notifier"
   output_path = "${path.module}/lambda_playbook_telegram_notifier.zip"
 }
 
@@ -1612,8 +1665,8 @@ resource "aws_lambda_function" "telegram_notifier" {
   handler       = "handler.lambda_handler"
   runtime       = "python3.12"
   architectures = ["x86_64"]
-  memory_size   = 128
-  timeout       = 15
+  memory_size   = 256
+  timeout       = 30
 
   filename         = data.archive_file.telegram_notifier_zip[0].output_path
   source_code_hash = data.archive_file.telegram_notifier_zip[0].output_base64sha256

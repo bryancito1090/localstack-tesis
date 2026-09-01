@@ -115,3 +115,45 @@ output "telegram_notifier_lambda_name" {
   description = "Nombre de la Lambda de Telegram (si esta habilitada)."
 }
 
+output "ses_subdomain" {
+  value       = try(aws_ses_domain_identity.soc[0].domain, "")
+  description = "Subdominio registrado para Amazon SES."
+}
+
+output "ses_sender_email" {
+  value       = var.ses_sender_email
+  description = "Direccion del remitente firmada con DKIM para reportes de incidentes."
+}
+
+output "cloudflare_dkim_records" {
+  value = var.ses_domain != "" ? [
+    for token in try(aws_ses_domain_dkim.soc[0].dkim_tokens, []) : {
+      tipo         = "CNAME"
+      nombre       = "${token}._domainkey.soc"
+      contenido    = "${token}.dkim.amazonses.com"
+      proxy_status = "DNS only (Proxy deshabilitado / Nube Gris)"
+    }
+  ] : []
+  description = "Registros CNAME exactos para copiar en Cloudflare DNS para activar la Firma Digital DKIM."
+}
+
+output "cloudflare_spf_record" {
+  value = var.ses_domain != "" ? {
+    tipo         = "TXT"
+    nombre       = "soc"
+    contenido    = "v=spf1 include:amazonses.com ~all"
+    proxy_status = "DNS only"
+  } : null
+  description = "Registro SPF para autorizar el envio de correos desde Amazon SES en Cloudflare."
+}
+
+output "cloudflare_dmarc_record" {
+  value = var.ses_domain != "" ? {
+    tipo         = "TXT"
+    nombre       = "_dmarc.soc"
+    contenido    = "v=DMARC1; p=none;"
+    proxy_status = "DNS only"
+  } : null
+  description = "Registro DMARC para validar la autenticacion de correos en Cloudflare."
+}
+

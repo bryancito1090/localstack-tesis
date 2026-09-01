@@ -19,6 +19,10 @@ authorized_ip_cidrs = []
 # Opcional: correo para SNS y Budget. Debes confirmar la suscripcion SNS por email.
 alert_email = "tu_correo@ejemplo.com"
 
+# Subdominio para firma digital DKIM en Amazon SES (opcional)
+ses_domain       = "soc.tudominio.com"
+ses_sender_email = "alertas@soc.tudominio.com"
+
 # Opcional: Notificaciones a Telegram
 # Obtén el token con @BotFather y el chat_id con @userinfobot o @RawDataBot
 telegram_bot_token = ""
