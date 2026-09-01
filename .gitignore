@@ -1,0 +1,25 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+.terraform.lock.hcl
+terraform.tfvars
+terraform.tfvars.json
+
+# Lambda build artifacts
+*.zip
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Environment & credentials
+.env
+.env.*
+*.pem
+*.key
+
+# Backups and logs
+*.log
+backup_*/
