@@ -49,6 +49,18 @@ variable "alert_email" {
   default     = ""
 }
 
+variable "ses_domain" {
+  description = "Subdominio o dominio registrado para firma digital DKIM en Amazon SES (ej: soc.tudominio.com)."
+  type        = string
+  default     = ""
+}
+
+variable "ses_sender_email" {
+  description = "Direccion de remitente firmada con DKIM para el envio de reportes SOC (ej: alertas@soc.tudominio.com)."
+  type        = string
+  default     = ""
+}
+
 variable "create_budget" {
   description = "Crear un presupuesto mensual con alertas si alert_email no esta vacio."
   type        = bool

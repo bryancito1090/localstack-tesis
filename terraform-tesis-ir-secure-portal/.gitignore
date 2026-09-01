@@ -3,6 +3,16 @@
 *.tfstate.*
 .terraform.lock.hcl
 terraform.tfvars
-lambda_tesis_detector.zip
+terraform.tfvars.json
+
+# Lambda build artifacts
+*.zip
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Crash logs
 crash.log
 crash.*.log
