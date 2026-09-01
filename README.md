@@ -1,232 +1,182 @@
-# Entorno de Desarrollo Local — Tesis: Sistema de Detección y Respuesta ante Incidentes en AWS
+# Sistema de Detección y Respuesta Automatizada ante Incidentes en AWS
 
-## Contexto del Proyecto
-
-Este documento describe el entorno local emulado para desarrollar el **Componente C: Automatización de Respuesta**, parte del Trabajo de Integración Curricular sobre diseño e implementación de un sistema de detección y respuesta ante incidentes de seguridad en entornos cloud (AWS).
-
-| Componente | Responsable | Descripción |
-|------------|-------------|-------------|
-| A — Arquitectura y Logs | Melany | CloudTrail, VPC Flow Logs, GuardDuty, S3, Glue |
-| B — Detección de Incidentes | Aarón | Reglas SQL/Athena, CloudWatch Alarms, DuckDB local |
-| **C — Automatización de Respuesta** | **Bryan** | **Lambda Playbooks, IAM, SNS, respuesta automatizada** |
+**Trabajo de Integración Curricular (Tesis de Grado)**  
+**Tema:** Diseño e Implementación de un Sistema de Detección y Respuesta ante Incidentes de Seguridad en Entornos Cloud (AWS)  
+**Autor (Componente C - Automatización de Respuesta):** Bryan Baño  
+**Dominio SOC Institucional:** `soc.bryan-bano.com` (Certificado con Firma Digital DKIM / SPF / DMARC)  
 
 ---
 
-## ¿Por qué un entorno local?
+## 1. Descripción del Proyecto
 
-Probar directamente en AWS real durante el desarrollo tiene dos problemas críticos:
+Este repositorio contiene la arquitectura completa de **Detección y Respuesta Automatizada a Incidentes de Seguridad (IR - Incident Response)** implementada como **Infraestructura como Código (IaC)** en Amazon Web Services (AWS) con Terraform, complementada con un entorno de pruebas emulado en LocalStack.
 
-1. **Costos descontrolados**: errores en bucles Lambda o mala configuración de triggers pueden generar cargos exponenciales.
-2. **Lentitud de iteración**: cada prueba requiere despliegue real, latencia de red y permisos de cuenta.
-
-El entorno local permite iterar en segundos, sin internet y sin tarjeta de crédito.
+El sistema monitoriza telemetría en tiempo real (logs de aplicaciones web, VPC Flow Logs, AWS CloudTrail y S3 Data Events), detecta Indicadores de Compromiso (IoCs) mediante funciones Lambda de correlación temporal y ejecuta playbooks de mitigación inmediata (bloqueo de red en Network ACLs y revocación de credenciales IAM con contención `EmergencyDenyAll`), despachando alertas enriquecidas y firmadas digitalmente por múltiples canales (Gmail y Telegram).
 
 ---
 
-## Arquitectura de Emulación Local
+## 2. Componentes del Proyecto
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                    Docker Compose Stack                      │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │              LocalStack 3.8 (community)               │   │
-│  │  ┌──────┐  ┌──────┐  ┌────────┐  ┌───┐  ┌───────┐  │   │
-│  │  │  S3  │  │ SNS  │  │ Lambda │  │IAM│  │  SQS  │  │   │
-│  │  └──────┘  └──────┘  └────────┘  └───┘  └───────┘  │   │
-│  │  ┌──────────────────────────────────────────────┐    │   │
-│  │  │          CloudWatch Logs / Events             │    │   │
-│  │  └──────────────────────────────────────────────┘    │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                     localhost:4566                           │
-│                                                             │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │           DuckDB (reemplaza Amazon Athena)            │   │
-│  │      Consulta directa de archivos JSON de logs        │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-         │
-         ▼
-  awslocal → .venv/bin/awslocal → apunta a localhost:4566
-  aws CLI  → perfil "local" con credenciales ficticias
-```
-
-### Mapeo: AWS Real → Emulación Local
-
-| Servicio AWS Real | Emulación Local | Propósito en el Proyecto |
+| Componente | Rol / Responsable | Descripción Técnica |
 |---|---|---|
-| Amazon S3 | LocalStack S3 | Almacenamiento de logs JSON |
-| AWS Lambda | LocalStack Lambda | Playbooks de respuesta automatizada |
-| Amazon SNS | LocalStack SNS | Notificaciones de alertas al equipo |
-| Amazon SQS | LocalStack SQS | Cola de eventos para triggear Lambdas |
-| AWS IAM | LocalStack IAM | Roles y políticas de mínimo privilegio |
-| CloudWatch Logs | LocalStack CloudWatch | Centralización de logs |
-| Amazon Athena | **DuckDB local** | Consultas SQL sobre logs JSON |
-| AWS GuardDuty | **Scripts Python** | Simulación de hallazgos de seguridad |
-| AWS CloudTrail | **cloudtrail_gen.py** | Generación de eventos de API simulados |
+| **Componente A — Arquitectura y Logs** | Melany | CloudTrail, VPC Flow Logs, GuardDuty, S3, Glue y retención forense |
+| **Componente B — Detección de Incidentes** | Aarón | Reglas de correlación temporal, filtros de logs y análisis forense |
+| **Componente C — Automatización de Respuesta** | **Bryan** | **Motor de detección Lambda, Playbooks serverless, contención en NACL/IAM, firma DKIM SES y bot visual de Telegram** |
 
 ---
 
-## Stack Tecnológico Instalado
+## 3. Matriz de Cobertura de Incidentes
 
-| Herramienta | Versión | Rol |
-|---|---|---|
-| Docker Engine | 29.3.0 | Motor de contenedores |
-| Docker Compose | 5.1.0 | Orquestación del stack |
-| LocalStack | 3.8.1 community | Emulador de servicios AWS |
-| Python | 3.14.3 | Scripts de simulación y Lambdas |
-| aws-cli-v2 | 2.34.24 | Interfaz de comandos (perfil `local`) |
-| awscli-local | 0.22.2 | Wrapper `awslocal` para LocalStack |
-| boto3 | 1.42.88 | SDK Python para AWS / LocalStack |
-| DuckDB | 1.5.1 | Motor SQL local (reemplaza Athena) |
+El sistema implementa 5 playbooks de detección y respuesta automatizada estandarizados bajo un esquema formal de 3 bloques (`INFORMACION GENERAL`, `RECURSO Y ORIGEN / CONTENCION`, `CRITERIO Y TRAZABILIDAD`) y sin uso de emojis:
 
-> Las dependencias Python están aisladas en `.venv/` dentro del proyecto.
-> `awslocal` se encuentra en `.venv/bin/awslocal`.
+| # | Tipo de Incidente | Fuente de Telemetría | Severidad / Color | Playbooks Ejecutados | Acción de Mitigación Real | Canales de Notificación |
+|---|---|---|---|---|---|---|
+| **1** | `BRUTE_FORCE` | Logs Nginx EC2 / ConsoleLogin | `HIGH` (Naranja) | `notify-alert`, `block-ip` | Inserción de regla `DENY` en Network ACL de VPC | Gmail (HTML) + Telegram (PNG) |
+| **2** | `PORT_SCAN` | VPC Flow Logs (`REJECT` > umbral) | `MEDIUM` (Ámbar) | `notify-alert`, `block-ip` | Inserción de regla `DENY` en Network ACL de VPC | Gmail (HTML) + Telegram (PNG) |
+| **3** | `PRIVILEGE_ESCALATION` | AWS CloudTrail (`AttachUserPolicy`) | `CRITICAL` (Rojo) | `notify-alert`, `revoke-credentials` | Desactiva llaves IAM + Adjunta `EmergencyDenyAll` | Gmail (HTML) + Telegram (PNG) |
+| **4** | `CREDENTIAL_LEAK` | CloudTrail (`GetCallerIdentity` IP no autorizada) | `CRITICAL` (Rojo) | `notify-alert`, `revoke-credentials` | Desactiva llaves IAM + Adjunta `EmergencyDenyAll` | Gmail (HTML) + Telegram (PNG) |
+| **5** | `EXFILTRATION` | CloudTrail S3 Data Events (`GetObject` > 50/h) | `HIGH` (Naranja) | `notify-alert` | Alerta forense y trazabilidad en S3 | Gmail (HTML) + Telegram (PNG) |
 
 ---
 
-## Estructura de Archivos
+## 4. Arquitectura de Notificaciones y Firma Digital
 
+```text
+               ┌────────────────────────────────────────────────────────┐
+               │              TELEMETRIA Y FUENTES DE LOGS              │
+               │   (EC2 Portal / VPC Flow Logs / AWS CloudTrail / S3)   │
+               └───────────────────────────┬────────────────────────────┘
+                                           │
+                                           ▼
+               ┌────────────────────────────────────────────────────────┐
+               │          LAMBDA DETECTOR (Correlación de IoCs)         │
+               └───────────────┬────────────────────────┬───────────────┘
+                               │                        │
+                    (SQS Notify Queue)         (SQS Playbook Queue)
+                               │                        │
+                               ▼                        ▼
+               ┌────────────────────────┐    ┌────────────────────────┐
+               │ PLAYBOOK: notify-alert │    │ PLAYBOOK: block-ip /   │
+               │                        │    │ revoke-credentials     │
+               └───────────────┬────────┘    └──────────┬─────────────┘
+                               │                        │
+            ┌──────────────────┴────────────────────────┴──────────────────┐
+            │                                                              │
+            ▼ (Amazon SES HTML Directo)                                    ▼ (Amazon SNS Topic)
+┌───────────────────────────────────────┐                    ┌──────────────────────────────┐
+│                GMAIL                  │                    │ LAMBDA: telegram-notifier    │
+│  - Tarjeta HTML con estilos CSS       │                    │  - Motor gráfico PNG puro    │
+│  - Firma Digital Criptográfica DKIM   │                    │  - API sendPhoto (Multipart) │
+│  - Remitente: alertas@soc.bryan-bano.com                   └──────────────┬───────────────┘
+└───────────────────────────────────────┘                                   │
+                                                                            ▼
+                                                             ┌──────────────────────────────┐
+                                                             │           TELEGRAM           │
+                                                             │ - Tarjeta Gráfica en Imagen  │
+                                                             │ - Sin texto plano            │
+                                                             └──────────────────────────────┘
 ```
+
+### Características de las Notificaciones:
+1. **Firma Digital DKIM (Amazon SES + Cloudflare):**
+   - Subdominio `soc.bryan-bano.com` validado con registros CNAME DKIM, SPF TXT y DMARC TXT en Cloudflare DNS.
+   - Reputación 100% libre de Spam y entrega garantizada en la bandeja principal de Gmail.
+2. **Tarjetas Gráficas para Telegram (`card_image.py`):**
+   - Motor rasterizador en Python puro con `zlib` y `struct` (cero dependencias externas en AWS Lambda).
+   - Genera imágenes PNG con cabecera coloreada por severidad, insignias, tablas estructuradas y bloques de diagnóstico.
+
+---
+
+## 5. Estructura del Repositorio
+
+```text
 localstack-tesis/
-├── ENTORNO_LOCAL.md              ← Este documento
-├── docker-compose.yml            ← Stack de LocalStack (imagen 3.8)
-├── .env                          ← Variables de entorno del proyecto
-├── activate.sh                   ← Activa el venv y exporta variables
-├── requirements.txt              ← Dependencias Python del proyecto
+├── terraform-tesis-ir-secure-portal/      ← Infraestructura principal en AWS (Terraform)
+│   ├── main.tf                            ← Recursos AWS (VPC, EC2, Lambdas, SQS, SES, SNS)
+│   ├── variables.tf                       ← Declaración de variables configurables
+│   ├── outputs.tf                         ← Salidas de red, DNS DKIM y buckets
+│   ├── terraform.tfvars.example           ← Plantilla pública de variables
+│   ├── .gitignore                         ← Exclusión de secretos y estados locales
+│   │
+│   ├── lambda/                            ← Motor de Detección
+│   │   └── lambda_function.py             ← Correlación de logs y despacho SQS
+│   │
+│   ├── playbooks/                         ← Playbooks de Respuesta Serverless
+│   │   ├── notify_alert/                  ← Genera y envía tarjetas HTML vía SES y SNS
+│   │   ├── block_ip/                      ← Aplica contención en VPC Network ACL
+│   │   ├── revoke_credentials/            ← Revoca accesos IAM con EmergencyDenyAll
+│   │   └── telegram_notifier/             ← Renderiza imágenes PNG y envía a Telegram
+│   │       ├── handler.py                 ← Consumidor SNS y cliente sendPhoto
+│   │       └── card_image.py              ← Motor gráfico nativo en Python puro
+│   │
+│   ├── GUIA_PRUEBAS_INCIDENTES.md         ← Manual paso a paso de pruebas de incidentes
+│   └── RESUMEN_IMPLEMENTACION_SOC_NOTIFICACIONES.md ← Informe técnico consolidado
 │
-├── .venv/                        ← Entorno virtual Python (no commitear)
-│
-├── .claude/
-│   └── commands/                 ← Skills de Claude Code (ver sección Skills)
-│
-├── infra/
-│   ├── setup.sh                  ← Bootstrap de recursos AWS locales
-│   └── lambda-policies/
-│       └── base-policy.json      ← Política IAM base para Lambdas
-│
-├── lambdas/                      ← Playbooks de respuesta automatizada
-│   ├── notify-alert/             ← Publica alerta a SNS
-│   │   ├── handler.py
-│   │   ├── policy.json
-│   │   └── test_event.json
-│   └── revoke-credentials/       ← Desactiva keys IAM comprometidas
-│       ├── handler.py
-│       ├── policy.json
-│       └── test_event.json
-│
-├── simulators/
-│   ├── cloudtrail_gen.py         ← Genera eventos CloudTrail por tipo de incidente
-│   └── inject_logs.py            ← Sube eventos a S3 y envía mensaje a SQS
-│
-├── queries/                      ← SQL para DuckDB (equivalente a Athena)
-│   ├── detect_brute_force.sql
-│   ├── detect_privilege_esc.sql
-│   └── detect_exfiltration.sql
-│
-└── logs/
-    └── sample_cloudtrail.json    ← Log de referencia para pruebas sin LocalStack
+├── docker-compose.yml                     ← Stack local opcional de LocalStack 3.8
+├── requirements.txt                       ← Dependencias auxiliares de desarrollo
+└── README.md                              ← Este documento
 ```
 
 ---
 
-## Recursos AWS Locales Creados
+## 6. Guía Rápida de Despliegue en AWS
 
-Estos recursos ya existen en LocalStack y se recrean con `bash infra/setup.sh` si se pierde el estado (LocalStack no persiste entre reinicios por defecto).
-
-| Tipo | Nombre | ARN / URL |
-|---|---|---|
-| S3 | `tesis-security-logs` | prefijos: `cloudtrail/`, `vpc-flow/`, `guardduty/`, `responses/` |
-| SNS | `tesis-security-alerts` | `arn:aws:sns:us-east-1:000000000000:tesis-security-alerts` |
-| SNS | `tesis-lambda-triggers` | `arn:aws:sns:us-east-1:000000000000:tesis-lambda-triggers` |
-| SQS | `tesis-incident-queue` | cola principal de eventos de incidentes |
-| SQS | `tesis-incident-queue-dlq` | dead letter queue para mensajes fallidos |
-| CloudWatch | `/tesis/security-events` | log group de eventos de seguridad |
-| CloudWatch | `/tesis/lambda-responses` | log group de respuestas de Lambdas |
-| IAM | `tesis-lambda-response-role` | `arn:aws:iam::000000000000:role/tesis-lambda-response-role` |
-
----
-
-## Cómo iniciar el entorno
-
-Estos son los pasos para tener el entorno operativo al comenzar cada sesión de trabajo.
-
-### Paso 1 — Activar el entorno Python
-
-Desde el directorio del proyecto:
-
+### Paso 1: Configurar Variables Locales
+Copia la plantilla y configura tus valores personales en `terraform.tfvars`:
 ```bash
-source activate.sh
+cd terraform-tesis-ir-secure-portal
+cp terraform.tfvars.example terraform.tfvars
+```
+Edita `terraform.tfvars`:
+```hcl
+aws_region       = "ca-central-1"
+project_name     = "tesis-ir"
+ssh_allowed_cidr = "TU_IP_PUBLICA/32"
+alert_email      = "tu_correo@gmail.com"
+ses_domain       = "soc.bryan-bano.com"
+ses_sender_email = "alertas@soc.bryan-bano.com"
+telegram_bot_token = "TU_TELEGRAM_BOT_TOKEN"
+telegram_chat_id   = "TU_TELEGRAM_CHAT_ID"
 ```
 
-Esto activa el venv y exporta las variables de entorno necesarias (`AWS_ENDPOINT_URL`, `AWS_DEFAULT_REGION`, etc.). Solo dura la sesión de terminal actual.
-
-### Paso 2 — Levantar LocalStack
-
+### Paso 2: Desplegar la Infraestructura
 ```bash
-docker compose up -d
-```
-
-Espera unos segundos y verifica que esté healthy:
-
-```bash
-curl -s http://localhost:4566/_localstack/health | python3 -m json.tool
-```
-
-Los servicios relevantes deben aparecer como `"available"`: `s3`, `sns`, `sqs`, `lambda`, `iam`, `logs`.
-
-### Paso 3 — Recrear los recursos AWS locales
-
-LocalStack **no persiste** su estado entre reinicios. Cada vez que se levanta de cero hay que recrear los recursos:
-
-```bash
-bash infra/setup.sh
-```
-
-> Si el venv no está activo, usa la ruta completa: `.venv/bin/awslocal` en lugar de `awslocal`.
-
-### Resumen de comandos por sesión
-
-```bash
-cd ~/localstack-tesis
-source activate.sh
-docker compose up -d
-bash infra/setup.sh
+terraform init
+terraform apply -auto-approve
 ```
 
 ---
 
-## Skills de Claude Code
+## 7. Ejecución de Pruebas de Incidentes
 
-Los skills están en `.claude/commands/` y solo están disponibles cuando Claude Code está abierto en este directorio. Se invocan escribiendo el nombre en el chat.
-
-| Skill | Descripción |
-|---|---|
-| `/localstack-up` | Verifica si LocalStack está corriendo y lo levanta si no. Muestra el estado de cada servicio relevante para el Componente C. |
-| `/bootstrap-resources` | Crea todos los recursos AWS locales del proyecto (S3, SNS, SQS, IAM, CloudWatch). Equivale a correr `bash infra/setup.sh`. |
-| `/simulate-incident [tipo]` | Genera un evento de incidente de seguridad sintético, lo sube a S3 y envía el mensaje a SQS para activar el flujo completo. Tipos: `brute-force`, `privilege-escalation`, `credential-leak`, `exfiltration`, `port-scan`. |
-| `/deploy-lambda [playbook]` | Empaqueta y despliega un Lambda Playbook en LocalStack. Lo invoca con su `test_event.json` y muestra el resultado. Playbooks: `notify-alert`, `revoke-credentials`, `block-ip`, `isolate-instance`. |
-| `/query-logs [tipo]` | Descarga logs de S3 y ejecuta una consulta DuckDB sobre ellos (equivalente a Athena). Tipos: `brute-force`, `privilege-escalation`, `exfiltration`, `summary`, `recent`. |
-| `/new-playbook [descripción]` | Crea la estructura completa de un nuevo Lambda Playbook: `handler.py`, `policy.json` (mínimo privilegio) y `test_event.json`. |
-
-### Flujo de trabajo típico
-
+### Prueba 1: Fuerza Bruta en el Portal Web (`BRUTE_FORCE`)
+```bash
+PORTAL_IP=$(terraform output -raw portal_public_ip)
+for i in {1..5}; do
+  curl -s -X POST "http://$PORTAL_IP/login" -d "username=admin.demo&password=wrongpassword$i" -o /dev/null
+done
 ```
-/localstack-up
-    → /bootstrap-resources          (si es primera vez o LocalStack fue reiniciado)
-        → /simulate-incident brute-force
-            → /query-logs brute-force
-                → /deploy-lambda notify-alert
+* **Resultado:** Alerta Naranja (`HIGH`) y Mitigación Roja (`BLOCKED`) en Gmail y Telegram (NACL bloquea la IP).
+
+### Prueba 2: Escalada de Privilegios IAM (`PRIVILEGE_ESCALATION`)
+```bash
+aws iam create-user --user-name tesis-ir-temp-escalation-test
+aws iam attach-user-policy --user-name tesis-ir-temp-escalation-test --policy-arn "arn:aws:iam::aws:policy/ReadOnlyAccess"
+```
+* **Resultado:** Alerta Roja (`CRITICAL`) y Mitigación Azul (`CONTAINED`) revocando credenciales con `EmergencyDenyAll`.
+* **Limpieza:**
+```bash
+aws iam delete-user-policy --user-name tesis-ir-temp-escalation-test --policy-name EmergencyDenyAll 2>/dev/null
+aws iam detach-user-policy --user-name tesis-ir-temp-escalation-test --policy-arn "arn:aws:iam::aws:policy/ReadOnlyAccess" 2>/dev/null
+aws iam delete-user --user-name tesis-ir-temp-escalation-test
 ```
 
 ---
 
-## Restricciones del Entorno
+## 8. Apagado y Destrucción de Recursos (Control de Costos)
 
-1. **No usar la consola web de AWS real** ni credenciales reales en ningún archivo.
-2. **No usar SIEMs comerciales** (Splunk, Datadog, Elastic). Solo servicios AWS nativos emulados.
-3. **Athena → DuckDB**: todas las consultas SQL sobre logs se hacen con DuckDB.
-4. **GuardDuty → Scripts Python**: los hallazgos se simulan con `simulators/cloudtrail_gen.py`.
-5. Cada Lambda debe tener su `policy.json` con permisos de mínimo privilegio.
-6. Los archivos en `logs/` son datos sintéticos, nunca logs reales de producción.
-7. LocalStack Community **no persiste** estado entre reinicios: siempre correr `setup.sh` al levantar.
+Para apagar la infraestructura completa y no incurrir en costos de AWS:
+```bash
+terraform destroy -auto-approve
+```
+*Los registros DNS en Cloudflare y los archivos de configuración local se mantendrán listos para el próximo despliegue sin requerir reconfiguración manual.*
