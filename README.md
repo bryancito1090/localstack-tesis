@@ -91,6 +91,17 @@ El sistema implementa 5 playbooks de detección y respuesta automatizada estanda
 
 ```text
 localstack-tesis/
+├── docs/                                  ← Documentación técnica integral de tesis
+│   ├── README.md                          ← Índice general y mapa de navegación
+│   ├── 01-contexto-tesis-y-roles.md       ← Marco académico, roles A/B/C y contratos
+│   ├── 02-arquitectura-tecnica-y-flujos.md← Flujo end-to-end de telemetría y respuesta
+│   ├── 03-infraestructura-como-codigo-terraform.md ← Recursos AWS en main.tf y variables
+│   ├── 04-motor-deteccion-e-incidentes.md ← Lógica del Lambda Detector B y matriz IoC
+│   ├── 05-playbooks-de-respuesta-automatizada.md ← Playbooks de contención y notificaciones
+│   ├── 06-guia-de-pruebas-y-simulaciones.md ← Guía paso a paso de validación forense
+│   ├── 07-convencion-de-ramas-y-gitflow.md ← Estándares de GitFlow y ciclo de PRs
+│   └── 08-estrategia-costos-y-entornos.md ← Arquitectura serverless de bajo costo (< $5)
+│
 ├── terraform-tesis-ir-secure-portal/      ← Infraestructura principal en AWS (Terraform)
 │   ├── main.tf                            ← Recursos AWS (VPC, EC2, Lambdas, SQS, SES, SNS)
 │   ├── variables.tf                       ← Declaración de variables configurables
@@ -110,10 +121,8 @@ localstack-tesis/
 │   │       └── card_image.py              ← Motor gráfico nativo en Python puro
 │   │
 │   ├── GUIA_PRUEBAS_INCIDENTES.md         ← Manual paso a paso de pruebas de incidentes
-│   └── RESUMEN_IMPLEMENTACION_SOC_NOTIFICACIONES.md ← Informe técnico consolidado
+│   └── README_EJECUCION.md                ← Instrucciones locales de ejecución
 │
-├── docker-compose.yml                     ← Stack local opcional de LocalStack 3.8
-├── requirements.txt                       ← Dependencias auxiliares de desarrollo
 └── README.md                              ← Este documento
 ```
 
