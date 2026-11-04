@@ -100,7 +100,9 @@ localstack-tesis/
 │   ├── 05-playbooks-de-respuesta-automatizada.md ← Playbooks de contención y notificaciones
 │   ├── 06-guia-de-pruebas-y-simulaciones.md ← Guía paso a paso de validación forense
 │   ├── 07-convencion-de-ramas-y-gitflow.md ← Estándares de GitFlow y ciclo de PRs
-│   └── 08-estrategia-costos-y-entornos.md ← Arquitectura serverless de bajo costo (< $5)
+│   ├── 08-estrategia-costos-y-entornos.md ← Arquitectura serverless de bajo costo (< $5)
+│   ├── 09-integracion-ansible-gestion-configuracion.md ← Integración de Ansible (CM) y roles
+│   └── 10-guia-configuracion-aws-cuenta-nueva-y-forgejo.md ← Manual de cuenta AWS y Forgejo
 │
 ├── terraform-tesis-ir-secure-portal/      ← Infraestructura principal en AWS (Terraform)
 │   ├── main.tf                            ← Recursos AWS (VPC, EC2, Lambdas, SQS, SES, SNS)
