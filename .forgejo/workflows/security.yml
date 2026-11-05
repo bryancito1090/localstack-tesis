@@ -1,113 +1,80 @@
-name: Validacion
+name: Seguridad de main
 
 on:
-  pull_request:
-    branches: [develop]
   push:
-    branches: [develop]
-  workflow_dispatch:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
 
 jobs:
-  gitflow:
-    name: gitflow
+  security-audit:
+    name: Escaneo de Secretos (Gitleaks) y Gobernanza
     runs-on: ubuntu-latest
+
     steps:
-      - uses: https://github.com/actions/checkout@v4
+      - name: Checkout Code
+        uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-          github-server-url: https://git.bryan-bano.com
-      - uses: https://github.com/astral-sh/setup-uv@v6
-        with:
-          github-token: ''
-          enable-cache: false
-      - name: Validar rama, issue, milestone, etiquetas y commits
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          GITHUB_SERVER_URL: https://git.bryan-bano.com
-        run: uv run --no-project --python 3.12 python scripts/check_gitflow.py
 
-  ansible:
-    name: ansible
-    runs-on: ubuntu-latest
-    steps:
-      - uses: https://github.com/actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-          github-server-url: https://git.bryan-bano.com
-      - uses: https://github.com/astral-sh/setup-uv@v6
-        with:
-          github-token: ''
-          enable-cache: false
-      - name: Instalar dependencias y coleccion AWS
+      - name: Instalar y Ejecutar Gitleaks
         run: |
-          uv venv --python 3.12 .venv
-          uv pip install --python .venv/bin/python -r ansible/requirements.txt
-          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
-          export PATH="$PWD/.venv/bin:$PATH"
-          ansible-galaxy collection install -r ansible/requirements.yml
-      - name: Validar sintaxis y buenas practicas
-        working-directory: ansible
-        run: |
-          ansible-playbook -i inventory/hosts.example.yml playbook.yml --syntax-check
-          ansible-lint playbook.yml
-      - name: Probar autenticacion, eventos, inventario y reglas de integracion
-        run: python -m unittest discover -s tests -v
-
-  terraform:
-    name: terraform
-    runs-on: ubuntu-latest
-    steps:
-      - uses: https://github.com/actions/checkout@v4
-        with:
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-          github-server-url: https://git.bryan-bano.com
-      - uses: https://github.com/hashicorp/setup-terraform@v3
-        with:
-          terraform_version: '1.15.9'
-          terraform_wrapper: false
-      - name: Validar infraestructura sin credenciales AWS
-        working-directory: terraform-tesis-ir-secure-portal
-        run: |
-          terraform fmt -check -diff
-          terraform init -backend=false -input=false
-          terraform validate -no-color
-
-  secretos:
-    name: secretos
-    runs-on: ubuntu-latest
-    steps:
-      - uses: https://github.com/actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          persist-credentials: false
-          github-server-url: https://git.bryan-bano.com
-      - name: Descargar Gitleaks y verificar checksum
-        run: |
-          set -eu
-          mkdir -p /tmp/tesis-gitleaks
-          cd /tmp/tesis-gitleaks
-          base=https://github.com/gitleaks/gitleaks/releases/download/v8.24.3
-          case "$(uname -m)" in
-            x86_64) archive=gitleaks_8.24.3_linux_x64.tar.gz ;;
-            aarch64|arm64) archive=gitleaks_8.24.3_linux_arm64.tar.gz ;;
-            *) echo "Arquitectura no soportada" >&2; exit 1 ;;
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64) GITLEAKS_ARCH="x64" ;;
+            aarch64|arm64) GITLEAKS_ARCH="arm64" ;;
+            *) GITLEAKS_ARCH="x64" ;;
           esac
-          curl -fsSLO "$base/$archive"
-          curl -fsSLO "$base/gitleaks_8.24.3_checksums.txt"
-          sha256sum --check --ignore-missing gitleaks_8.24.3_checksums.txt
-          tar -xzf "$archive" gitleaks
-      - name: Buscar secretos en los commits del cambio
-        env:
-          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
-        run: |
-          set -eu
-          if [ -n "$BASE_SHA" ] && git cat-file -e "$BASE_SHA^{commit}" 2>/dev/null; then
-            /tmp/tesis-gitleaks/gitleaks git --redact --no-banner --log-opts="$BASE_SHA..HEAD" .
-          else
-            /tmp/tesis-gitleaks/gitleaks git --redact --no-banner --log-opts=-1 .
+
+          mkdir -p /tmp/bin
+          if ! command -v gitleaks &> /dev/null; then
+            echo "Instalando Gitleaks v8.18.4 para arquitectura $ARCH ($GITLEAKS_ARCH)..."
+            curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_${GITLEAKS_ARCH}.tar.gz" | tar -xz -C /tmp/bin gitleaks
+            export PATH="/tmp/bin:$PATH"
           fi
+
+          echo "Ejecutando escaneo profundo de secretos en código e historial..."
+          gitleaks detect --source . --redact --config .gitleaks.toml
+
+      - name: Validar Metadata de Pull Request
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD_REF: ${{ github.head_ref }}
+          PR_BASE_REF: ${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "==> Validando Pull Request: '$PR_TITLE'"
+          echo "    Origen: $PR_HEAD_REF -> Destino: $PR_BASE_REF"
+
+          # 1. Reglas de ramas (GitFlow)
+          if [[ "$PR_BASE_REF" == "develop" ]]; then
+            if ! [[ "$PR_HEAD_REF" =~ ^(feature|feat|chore|fix|bugfix|refactor|docs|test|perf)/ ]]; then
+              echo "❌ Error de Rama: PR hacia 'develop' debe originarse en feature/*, chore/*, fix/*, etc."
+              echo "    Rama recibida: '$PR_HEAD_REF'"
+              exit 1
+            fi
+          elif [[ "$PR_BASE_REF" == "main" || "$PR_BASE_REF" == "master" ]]; then
+            if ! [[ "$PR_HEAD_REF" =~ ^(release|hotfix)/ || "$PR_HEAD_REF" == "develop" ]]; then
+              echo "❌ Error de Rama: PR hacia producción ('main') debe provenir de 'develop', 'release/*' o 'hotfix/*'."
+              echo "    Rama recibida: '$PR_HEAD_REF'"
+              exit 1
+            fi
+          fi
+
+          # 2. Convención de Títulos (Conventional Commits)
+          TITLE_REGEX="^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_\-\./]+\))?!?: .+"
+          if ! [[ "$PR_TITLE" =~ $TITLE_REGEX ]]; then
+            echo "❌ Error de Título: Debe seguir Conventional Commits (ej. 'feat(auth): login', 'chore: update deps')."
+            echo "    Título recibido: '$PR_TITLE'"
+            exit 1
+          fi
+
+          # 3. Validación de Descripción
+          CLEAN_BODY=$(echo "$PR_BODY" | tr -d '[:space:]')
+          if [[ ${#CLEAN_BODY} -lt 15 ]]; then
+            echo "❌ Error de Descripción: La descripción del PR no puede estar vacía."
+            exit 1
+          fi
+
+          echo "✅ Validaciones de gobernanza y seguridad aprobadas."

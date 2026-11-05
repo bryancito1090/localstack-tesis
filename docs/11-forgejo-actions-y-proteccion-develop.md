@@ -2,7 +2,7 @@
 
 Ansible se entrega desde `feature/1-ansible-portal-cloudwatch`, asociada al Issue #1 en Forgejo, hacia `develop`. No se hace push directo a `develop` o `main`.
 
-El workflow [security.yml](../.forgejo/workflows/security.yml) usa un runner `ubuntu-latest`, Linux x86_64 o ARM64 con Node compatible con Actions y acceso HTTPS a GitHub, PyPI, Galaxy y los registros Terraform:
+El workflow [validate.yml](../.forgejo/workflows/validate.yml) usa un runner `ubuntu-latest`, Linux x86_64 o ARM64 con Node compatible con Actions y acceso HTTPS a GitHub, PyPI, Galaxy y los registros Terraform:
 
 | Job | Comprobacion |
 |---|---|
@@ -40,3 +40,5 @@ En Forgejo 1.21, editar etiquetas o milestone puede no iniciar otra ejecucion. C
 El runner anuncia internamente `http://forgejo:3000`, que no resuelve desde los contenedores de jobs. El checkout y las consultas de metadatos usan explicitamente `https://git.bryan-bano.com`; el runner debe poder alcanzar esa URL. No se desactiva la verificacion TLS.
 
 El runner disponible es ARM64 con imagen `node:22-bookworm`. Se usa `setup-uv` y un entorno Python 3.12 aislado para no depender de las distribuciones Ubuntu admitidas por `setup-python`. Gitleaks selecciona el archivo x64/ARM64 segun la arquitectura real.
+
+El workflow `security.yml` anterior se conserva para pushes/PR de `main`, con salida redactada. `validate.yml` atiende el circuito de `develop`, evitando duplicar el escaneo en el mismo PR.

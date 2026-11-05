@@ -92,7 +92,7 @@ El sistema implementa 5 playbooks de detección y respuesta automatizada estanda
 ```text
 localstack-tesis/
 ├── ansible/                               ← Portal, Nginx y CloudWatch Agent por SSM/SSH
-├── .forgejo/workflows/security.yml         ← Validacion de PR hacia develop
+├── .forgejo/workflows/validate.yml         ← Validacion de PR hacia develop
 ├── docs/                                  ← Documentación técnica integral de tesis
 │   ├── README.md                          ← Índice general y mapa de navegación
 │   ├── 01-contexto-tesis-y-roles.md       ← Marco académico, roles A/B/C y contratos
