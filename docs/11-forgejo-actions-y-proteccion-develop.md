@@ -2,7 +2,7 @@
 
 Ansible se entrega desde `feature/1-ansible-portal-cloudwatch`, asociada al Issue #1 en Forgejo, hacia `develop`. No se hace push directo a `develop` o `main`.
 
-El workflow [security.yml](../.forgejo/workflows/security.yml) usa un runner `ubuntu-latest`, Linux x86_64 con Node compatible con Actions y acceso HTTPS a GitHub, PyPI, Galaxy y los registros Terraform:
+El workflow [security.yml](../.forgejo/workflows/security.yml) usa un runner `ubuntu-latest`, Linux x86_64 o ARM64 con Node compatible con Actions y acceso HTTPS a GitHub, PyPI, Galaxy y los registros Terraform:
 
 | Job | Comprobacion |
 |---|---|
@@ -24,7 +24,7 @@ En **Settings → Branches**, protege `develop`:
 - Bloquear merge con rama desactualizada o revisiones que soliciten cambios.
 - Descartar aprobaciones obsoletas.
 
-Usa los nombres exactos de los estados del primer PR, no solo los del evento `push`. La proteccion se configura en Forgejo: el YAML por si solo no bloquea merges. Los administradores conservan las facultades del servidor; el flujo ordinario debe respetar checks y PR. Protege tambien `main` contra push directo; los cortes de version siguen el flujo de release documentado.
+Los contextos obligatorios configurados son `Validacion / gitflow (pull_request)`, `Validacion / ansible (pull_request)`, `Validacion / terraform (pull_request)` y `Validacion / secretos (pull_request)`. La proteccion se configura en Forgejo: el YAML por si solo no bloquea merges. Los administradores conservan las facultades del servidor; el flujo ordinario debe respetar checks y PR. Protege tambien `main` contra push directo; los cortes de version siguen el flujo de release documentado.
 
 ## Uso diario
 
@@ -36,3 +36,5 @@ Usa los nombres exactos de los estados del primer PR, no solo los del evento `pu
 6. Esperar los cuatro checks del ultimo commit y revisar el diff antes de integrar.
 
 En Forgejo 1.21, editar etiquetas o milestone puede no iniciar otra ejecucion. Completa los metadatos al crear el PR o relanza el workflow tras editarlos. No se publican comentarios automaticos ni se almacenan tokens personales o credenciales AWS en el YAML; el token efimero solo lee metadatos.
+
+El runner anuncia internamente `http://forgejo:3000`, que no resuelve desde los contenedores de jobs. El checkout y las consultas de metadatos usan explicitamente `https://git.bryan-bano.com`; el runner debe poder alcanzar esa URL. No se desactiva la verificacion TLS.
