@@ -1,0 +1,80 @@
+name: Seguridad y Detección de Fuga de Secretos
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  security-audit:
+    name: Escaneo de Secretos (Gitleaks) y Gobernanza
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Instalar y Ejecutar Gitleaks
+        run: |
+          ARCH=$(uname -m)
+          case "$ARCH" in
+            x86_64) GITLEAKS_ARCH="x64" ;;
+            aarch64|arm64) GITLEAKS_ARCH="arm64" ;;
+            *) GITLEAKS_ARCH="x64" ;;
+          esac
+
+          mkdir -p /tmp/bin
+          if ! command -v gitleaks &> /dev/null; then
+            echo "Instalando Gitleaks v8.18.4 para arquitectura $ARCH ($GITLEAKS_ARCH)..."
+            curl -sSL "https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_${GITLEAKS_ARCH}.tar.gz" | tar -xz -C /tmp/bin gitleaks
+            export PATH="/tmp/bin:$PATH"
+          fi
+
+          echo "Ejecutando escaneo profundo de secretos en código e historial..."
+          gitleaks detect --source . --verbose --config .gitleaks.toml
+
+      - name: Validar Metadata de Pull Request
+        if: github.event_name == 'pull_request'
+        env:
+          PR_HEAD_REF: ${{ github.head_ref }}
+          PR_BASE_REF: ${{ github.base_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: |
+          echo "==> Validando Pull Request: '$PR_TITLE'"
+          echo "    Origen: $PR_HEAD_REF -> Destino: $PR_BASE_REF"
+
+          # 1. Reglas de ramas (GitFlow)
+          if [[ "$PR_BASE_REF" == "develop" ]]; then
+            if ! [[ "$PR_HEAD_REF" =~ ^(feature|feat|chore|fix|bugfix|refactor|docs|test|perf)/ ]]; then
+              echo "❌ Error de Rama: PR hacia 'develop' debe originarse en feature/*, chore/*, fix/*, etc."
+              echo "    Rama recibida: '$PR_HEAD_REF'"
+              exit 1
+            fi
+          elif [[ "$PR_BASE_REF" == "main" || "$PR_BASE_REF" == "master" ]]; then
+            if ! [[ "$PR_HEAD_REF" =~ ^(release|hotfix)/ || "$PR_HEAD_REF" == "develop" ]]; then
+              echo "❌ Error de Rama: PR hacia producción ('main') debe provenir de 'develop', 'release/*' o 'hotfix/*'."
+              echo "    Rama recibida: '$PR_HEAD_REF'"
+              exit 1
+            fi
+          fi
+
+          # 2. Convención de Títulos (Conventional Commits)
+          TITLE_REGEX="^(feat|fix|chore|docs|style|refactor|perf|test|build|ci|revert)(\([a-zA-Z0-9_\-\./]+\))?!?: .+"
+          if ! [[ "$PR_TITLE" =~ $TITLE_REGEX ]]; then
+            echo "❌ Error de Título: Debe seguir Conventional Commits (ej. 'feat(auth): login', 'chore: update deps')."
+            echo "    Título recibido: '$PR_TITLE'"
+            exit 1
+          fi
+
+          # 3. Validación de Descripción
+          CLEAN_BODY=$(echo "$PR_BODY" | tr -d '[:space:]')
+          if [[ ${#CLEAN_BODY} -lt 15 ]]; then
+            echo "❌ Error de Descripción: La descripción del PR no puede estar vacía."
+            exit 1
+          fi
+
+          echo "✅ Validaciones de gobernanza y seguridad aprobadas."
