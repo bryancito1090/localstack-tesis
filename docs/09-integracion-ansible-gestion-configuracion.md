@@ -1,5 +1,7 @@
 # 09. Integración de Ansible para Gestión de Configuración (CM)
 
+> **Implementado:** los cuatro roles, inventario desde Terraform y bootstrap minimo estan en [`ansible/`](../ansible/README.md). Esa guia contiene los comandos vigentes, requisitos SSM/SSH, permisos, idempotencia y reemplazo inicial de EC2. El contenido siguiente conserva la justificacion y diseño original. El plugin actual es `amazon.aws.aws_ssm`; las actualizaciones globales se solicitan expresamente y el secreto de sesion se conserva.
+
 ## 1. Justificación Técnica y Académica para la Tesis
 
 En la arquitectura inicial del proyecto, el aprovisionamiento de la instancia EC2 y todo el software del portal web corporativo se concentraba en un script Bash monolítico dentro de [`terraform-tesis-ir-secure-portal/scripts/user_data.sh.tpl`](file:///home/bryan/Projects/LOCALSTACK/localstack-tesis/terraform-tesis-ir-secure-portal/scripts/user_data.sh.tpl) de más de 500 líneas.

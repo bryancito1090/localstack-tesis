@@ -1,0 +1,32 @@
+{
+  "agent": {
+    "region": {{ cloudwatch_agent_region | to_json }},
+    "run_as_user": "root"
+  },
+  "logs": {
+    "logs_collected": {
+      "files": {
+        "collect_list": [
+          {
+            "file_path": "/var/log/nginx/access.log",
+            "log_group_name": {{ cloudwatch_agent_log_group | to_json }},
+            "log_stream_name": "{instance_id}/nginx-access",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": "/var/log/nginx/error.log",
+            "log_group_name": {{ cloudwatch_agent_log_group | to_json }},
+            "log_stream_name": "{instance_id}/nginx-error",
+            "timezone": "UTC"
+          },
+          {
+            "file_path": {{ (portal_app_log_dir ~ '/app.log') | to_json }},
+            "log_group_name": {{ cloudwatch_agent_log_group | to_json }},
+            "log_stream_name": "{instance_id}/app",
+            "timezone": "UTC"
+          }
+        ]
+      }
+    }
+  }
+}

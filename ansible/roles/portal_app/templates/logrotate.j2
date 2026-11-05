@@ -1,0 +1,11 @@
+{{ portal_app_log_dir }}/app.log {
+    daily
+    maxsize 10M
+    rotate 7
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0640 {{ portal_app_user }} {{ portal_app_user }}
+    su {{ portal_app_user }} {{ portal_app_user }}
+}

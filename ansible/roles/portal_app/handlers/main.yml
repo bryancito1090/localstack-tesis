@@ -1,0 +1,5 @@
+---
+- name: Reiniciar portal
+  ansible.builtin.systemd_service:
+    name: tesis-portal
+    state: restarted

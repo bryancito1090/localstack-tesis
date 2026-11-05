@@ -1,0 +1,44 @@
+---
+- name: Configurar portal de laboratorio y telemetria
+  hosts: portal
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Esperar la conexion con EC2
+      ansible.builtin.wait_for_connection:
+        timeout: 600
+
+    - name: Esperar que termine el bootstrap de cloud-init
+      ansible.builtin.command: cloud-init status --wait
+      changed_when: false
+      when: not ansible_check_mode
+
+    - name: Recopilar datos del sistema operativo
+      ansible.builtin.setup:
+
+    - name: Verificar Amazon Linux 2023
+      ansible.builtin.assert:
+        that:
+          - ansible_facts.distribution == 'Amazon'
+          - ansible_facts.distribution_major_version == '2023'
+        fail_msg: Este playbook requiere Amazon Linux 2023.
+
+  roles:
+    - common
+    - portal_app
+    - nginx
+    - cloudwatch_agent
+
+  post_tasks:
+    - name: Aplicar los cambios de servicios antes de verificar
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verificar el portal a traves de Nginx
+      ansible.builtin.uri:
+        url: http://127.0.0.1/health
+        return_content: true
+      register: portal_health
+      until: portal_health.status == 200 and portal_health.json.status == 'ok'
+      retries: 10
+      delay: 3
+      when: not ansible_check_mode

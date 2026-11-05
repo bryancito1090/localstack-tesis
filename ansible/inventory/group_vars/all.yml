@@ -1,0 +1,8 @@
+---
+portal_app_user: tesisportal
+portal_app_dir: /opt/tesis-portal
+portal_app_log_dir: /var/log/tesis-portal
+portal_app_asset_name: tesis-ir-portal-ec2
+cloudwatch_agent_region: us-east-2
+cloudwatch_agent_log_group: /aws/ec2/tesis-ir-portal-app
+common_upgrade_packages: false

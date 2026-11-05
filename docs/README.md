@@ -1,5 +1,7 @@
 # Documentación Técnica del Sistema de Detección y Respuesta Automatizada ante Incidentes en AWS
 
+La gestion de configuracion ya esta implementada: [Ansible y despliegue del portal](../ansible/README.md), [Forgejo Actions y proteccion de develop](11-forgejo-actions-y-proteccion-develop.md).
+
 **Trabajo de Integración Curricular (Tesis de Grado)**  
 **Tema:** Diseño e Implementación de un Sistema de Detección y Respuesta ante Incidentes de Seguridad en Entornos Cloud (AWS)  
 **Autor Principal (Componente C - Automatización de Respuesta):** Bryan Baño  

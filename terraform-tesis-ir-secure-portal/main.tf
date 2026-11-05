@@ -65,7 +65,7 @@ locals {
   sensitive_bucket_name = "${var.project_name}-sensitive-data-${local.account_id}-${var.aws_region}"
 
   authorized_ip_cidrs = length(var.authorized_ip_cidrs) > 0 ? var.authorized_ip_cidrs : [var.ssh_allowed_cidr]
-  portal_http_cidrs  = length(var.http_allowed_cidrs) > 0 ? var.http_allowed_cidrs : [var.ssh_allowed_cidr]
+  portal_http_cidrs   = length(var.http_allowed_cidrs) > 0 ? var.http_allowed_cidrs : [var.ssh_allowed_cidr]
 
   common_log_groups = {
     cloudtrail = "/aws/cloudtrail/${var.project_name}-management"
@@ -537,9 +537,9 @@ resource "aws_iam_role" "ec2" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "ec2.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -594,10 +594,7 @@ resource "aws_instance" "portal" {
   iam_instance_profile        = aws_iam_instance_profile.ec2.name
   key_name                    = var.key_name != "" ? var.key_name : null
 
-  user_data_base64 = base64gzip(templatefile("${path.module}/scripts/user_data.sh.tpl", {
-    app_log_group = aws_cloudwatch_log_group.ec2_app.name
-    project_name  = var.project_name
-  }))
+  user_data_base64 = base64gzip(file("${path.module}/scripts/user_data.sh.tpl"))
 
   user_data_replace_on_change = true
 
@@ -635,9 +632,9 @@ resource "aws_iam_role" "vpc_flowlogs" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "vpc-flow-logs.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -697,9 +694,9 @@ resource "aws_iam_role" "cloudtrail_cloudwatch" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "cloudtrail.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -773,9 +770,9 @@ resource "aws_iam_role" "config" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "config.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -1065,9 +1062,9 @@ resource "aws_iam_role" "lambda_detector" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "lambda.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -1156,17 +1153,17 @@ resource "aws_lambda_function" "detector" {
 
   environment {
     variables = {
-      INCIDENTS_TABLE = aws_dynamodb_table.incidents.name
-      STATE_TABLE     = aws_dynamodb_table.state.name
-      EVIDENCE_BUCKET = aws_s3_bucket.evidence.bucket
-      SNS_TOPIC_ARN      = aws_sns_topic.alerts.arn
-      CONFIG_KEY         = aws_s3_object.detector_config.key
-      INCIDENT_QUEUE_URL        = aws_sqs_queue.incident_queue.url
-      PLAYBOOK_NOTIFY_QUEUE_URL = aws_sqs_queue.playbook_notify_queue.url
-      PLAYBOOK_BLOCK_IP_QUEUE_URL = aws_sqs_queue.playbook_block_ip_queue.url
+      INCIDENTS_TABLE                       = aws_dynamodb_table.incidents.name
+      STATE_TABLE                           = aws_dynamodb_table.state.name
+      EVIDENCE_BUCKET                       = aws_s3_bucket.evidence.bucket
+      SNS_TOPIC_ARN                         = aws_sns_topic.alerts.arn
+      CONFIG_KEY                            = aws_s3_object.detector_config.key
+      INCIDENT_QUEUE_URL                    = aws_sqs_queue.incident_queue.url
+      PLAYBOOK_NOTIFY_QUEUE_URL             = aws_sqs_queue.playbook_notify_queue.url
+      PLAYBOOK_BLOCK_IP_QUEUE_URL           = aws_sqs_queue.playbook_block_ip_queue.url
       PLAYBOOK_REVOKE_CREDENTIALS_QUEUE_URL = aws_sqs_queue.playbook_revoke_credentials_queue.url
-      VPC_ID                    = aws_vpc.this.id
-      PORTAL_INSTANCE_ID        = aws_instance.portal.id
+      VPC_ID                                = aws_vpc.this.id
+      PORTAL_INSTANCE_ID                    = aws_instance.portal.id
     }
   }
 
@@ -1271,9 +1268,9 @@ resource "aws_iam_role" "playbook_notify" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "lambda.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -1286,9 +1283,9 @@ resource "aws_iam_role" "playbook_block_ip" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "lambda.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -1328,9 +1325,9 @@ resource "aws_iam_role_policy" "playbook_notify" {
         Resource = aws_sns_topic.alerts.arn
       },
       {
-        Sid      = "SendSESEmail"
-        Effect   = "Allow"
-        Action   = [
+        Sid    = "SendSESEmail"
+        Effect = "Allow"
+        Action = [
           "ses:SendEmail",
           "ses:SendRawEmail"
         ]
@@ -1390,9 +1387,9 @@ resource "aws_iam_role_policy" "playbook_block_ip" {
         Resource = aws_sns_topic.alerts.arn
       },
       {
-        Sid      = "SendSESEmail"
-        Effect   = "Allow"
-        Action   = [
+        Sid    = "SendSESEmail"
+        Effect = "Allow"
+        Action = [
           "ses:SendEmail",
           "ses:SendRawEmail"
         ]
@@ -1510,9 +1507,9 @@ resource "aws_iam_role" "playbook_revoke_credentials" {
     Version = "2012-10-17"
     Statement = [
       {
-        Effect = "Allow"
+        Effect    = "Allow"
         Principal = { Service = "lambda.amazonaws.com" }
-        Action = "sts:AssumeRole"
+        Action    = "sts:AssumeRole"
       }
     ]
   })
@@ -1566,9 +1563,9 @@ resource "aws_iam_role_policy" "playbook_revoke_credentials" {
         Resource = aws_sns_topic.alerts.arn
       },
       {
-        Sid      = "SendSESEmail"
-        Effect   = "Allow"
-        Action   = [
+        Sid    = "SendSESEmail"
+        Effect = "Allow"
+        Action = [
           "ses:SendEmail",
           "ses:SendRawEmail"
         ]
