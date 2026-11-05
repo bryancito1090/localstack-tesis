@@ -81,6 +81,8 @@ ansible portal -b -m ansible.builtin.command -a 'tail -n 10 /var/log/tesis-porta
 
 La rotacion local es diaria, conserva siete archivos y evalua el limite de 10 MB al ejecutarse logrotate. CloudWatch envia `{instance_id}/app`, `/nginx-access` y `/nginx-error` al grupo exportado por Terraform. La [configuracion del agente](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/CloudWatch-Agent-Configuration-File-Details.html) contiene solo logs; la retencion del grupo sigue en Terraform.
 
+Ansible conserva la fuente en `/etc/tesis-cloudwatch-agent.json`, fuera de los archivos de trabajo que el agente consume o elimina al ejecutar `fetch-config`. Puedes inspeccionarla desde Session Manager sin modificar el servicio.
+
 ```bash
 # Desde la raiz; ajustar --region al output region.
 PORTAL_IP=$(terraform -chdir=terraform-tesis-ir-secure-portal output -raw portal_public_ip)
