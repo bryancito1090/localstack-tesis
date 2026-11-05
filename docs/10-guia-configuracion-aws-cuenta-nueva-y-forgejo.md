@@ -56,7 +56,7 @@ En la consola de administración de AWS se observa la siguiente configuración a
    - Haz clic en **Create access key**.
 7. **Guardar las credenciales (¡ACCIÓN CRÍTICA!):**
    - Verás dos valores en pantalla:
-     - **Access key:** Cadena de 20 caracteres que comienza por `AKIA...` (ej: `AKIA[REPLACE_EXAMPLE]`).
+     - **Access key:** Cadena de 20 caracteres que comienza por `AKIA...` (ej: `AKIA[TU-CLAVE-DE-20-CARACTERES]`).
      - **Secret access key:** Cadena secreta de 40 caracteres. Haz clic en el botón *"Show"* para visualizarla.
    - Haz clic en el botón **Download .csv file** para guardar una copia de seguridad local en tu disco duro (guárdala en una ubicación privada como `~/.aws/` o en tu gestor de contraseñas, jamás en la carpeta del repositorio Git).
    - Haz clic en **Done** (Listo).
@@ -75,8 +75,8 @@ aws configure
 La herramienta te solicitará cuatro datos consecutivos. Ingrésalos tal como se indica:
 
 ```text
-AWS Access Key ID [****************EPYG]: AKIA[REPLACE_EXAMPLE]    <-- Pega tu Access Key nueva
-AWS Secret Access Key [****************/f9c]: XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX <-- Pega tu Secret Key nueva
+AWS Access Key ID [****************EPYG]: AKIA[TU-CLAVE-DE-20-CARACTERES]    <-- Pega tu Access Key nueva
+AWS Secret Access Key [****************/f9c]: [TU-SECRET-KEY-DE-40-CARACTERES] <-- Pega tu Secret Key nueva
 Default region name [ca-central-1]: us-east-2                      <-- Región de tu nueva cuenta (Ohio)
 Default output format [json]: json                                 <-- Formato estándar JSON
 ```
