@@ -10,6 +10,8 @@ import urllib.request
 
 
 def check_pr(pr, issue, subjects):
+    if issue.get("pull_request"):
+        raise ValueError("La referencia debe apuntar a un issue, no a otro PR.")
     match = re.fullmatch(r"(feature|bugfix|chore)/(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*", pr["head"]["ref"])
     if not match:
         raise ValueError("La rama debe usar <feature|bugfix|chore>/<issue>-slug.")
@@ -57,8 +59,6 @@ def main():
     if current["head"]["sha"] != pr["head"]["sha"]:
         raise ValueError("La rama cambio durante la ejecucion; validar el HEAD mas reciente.")
     issue = get(f"/issues/{match.group(1)}")
-    if "pull_request" in issue:
-        raise ValueError("La referencia debe apuntar a un issue, no a otro PR.")
     subjects = subprocess.check_output(
         ["git", "log", "--format=%s", f"{pr['base']['sha']}..{pr['head']['sha']}"], text=True
     ).splitlines()

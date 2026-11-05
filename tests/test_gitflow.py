@@ -14,10 +14,14 @@ class GitflowTest(unittest.TestCase):
             "head": {"ref": "feature/1-ansible-portal"}, "base": {"ref": "develop"},
             "body": "Implementar portal. Closes #1", "labels": [{"name": "type::feature"}], "milestone": {"id": 2},
         }
-        self.issue = {"state": "open", "labels": [{"name": "type::feature"}], "milestone": {"id": 2}}
+        self.issue = {"state": "open", "labels": [{"name": "type::feature"}], "milestone": {"id": 2}, "pull_request": None}
 
     def test_valid_pr(self):
         gitflow.check_pr(self.pr, self.issue, ["feat: configurar portal con Ansible"])
+
+    def test_rejects_a_pull_request_used_as_issue(self):
+        with self.assertRaisesRegex(ValueError, "issue, no a otro PR"):
+            gitflow.check_pr(self.pr, {**self.issue, "pull_request": {"url": "/pulls/1"}}, ["feat: configurar portal con Ansible"])
 
     def test_rejects_invalid_metadata_and_commits(self):
         for mutation in [
