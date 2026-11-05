@@ -11,7 +11,7 @@ El workflow [security.yml](../.forgejo/workflows/security.yml) usa un runner `ub
 | `terraform` | Formato, inicializacion sin backend y validacion, sin plan/apply ni credenciales AWS. |
 | `secretos` | Gitleaks con reglas oficiales y exclusiones locales sobre commits nuevos, con salida redactada. |
 
-Los PR se validan sobre el SHA de origen. Los pushes permiten revisar codigo antes del PR; la comprobacion de metadatos requiere el PR. No hay filtros por archivos que dejen checks obligatorios sin ejecutar.
+Los PR se validan sobre el SHA de origen. Los pushes a `develop` vuelven a comprobar el codigo integrado; la comprobacion de metadatos requiere el PR. No hay filtros por archivos que dejen checks obligatorios sin ejecutar.
 
 ## Configuracion
 
@@ -38,3 +38,5 @@ Los contextos obligatorios configurados son `Validacion / gitflow (pull_request)
 En Forgejo 1.21, editar etiquetas o milestone puede no iniciar otra ejecucion. Completa los metadatos al crear el PR o relanza el workflow tras editarlos. No se publican comentarios automaticos ni se almacenan tokens personales o credenciales AWS en el YAML; el token efimero solo lee metadatos.
 
 El runner anuncia internamente `http://forgejo:3000`, que no resuelve desde los contenedores de jobs. El checkout y las consultas de metadatos usan explicitamente `https://git.bryan-bano.com`; el runner debe poder alcanzar esa URL. No se desactiva la verificacion TLS.
+
+El runner disponible es ARM64 con imagen `node:22-bookworm`. Se usa `setup-uv` y un entorno Python 3.12 aislado para no depender de las distribuciones Ubuntu admitidas por `setup-python`. Gitleaks selecciona el archivo x64/ARM64 segun la arquitectura real.
