@@ -1,0 +1,10 @@
+# Configuración de Gitleaks para exclusión de archivos locales de infraestructura
+[allowlist]
+description = "Exclusiones de archivos locales ignorados por git y falsos positivos"
+paths = [
+  '''(?i).*\.tfstate.*$''',
+  '''(?i)terraform\.tfvars.*$''',
+  '''(?i).*\.backup$''',
+  '''(?i)package-lock\.json$''',
+  '''(?i)\.terraform/.*'''
+]
