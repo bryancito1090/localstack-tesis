@@ -91,6 +91,8 @@ El sistema implementa 5 playbooks de detección y respuesta automatizada estanda
 
 ```text
 localstack-tesis/
+├── ansible/                               ← Portal, Nginx y CloudWatch Agent por SSM/SSH
+├── .forgejo/workflows/validate.yml         ← Validacion de PR hacia develop
 ├── docs/                                  ← Documentación técnica integral de tesis
 │   ├── README.md                          ← Índice general y mapa de navegación
 │   ├── 01-contexto-tesis-y-roles.md       ← Marco académico, roles A/B/C y contratos
@@ -155,6 +157,18 @@ telegram_chat_id   = "TU_TELEGRAM_CHAT_ID"
 terraform init
 terraform apply -auto-approve
 ```
+
+### Paso 3: Configurar el Portal con Ansible
+
+Instala las dependencias siguiendo [la guia operativa de Ansible](ansible/README.md). Desde la raiz:
+
+```bash
+python ansible/scripts/generate_inventory.py
+cd ansible
+ansible-playbook playbook.yml
+```
+
+El primer cambio de `user_data` puede reemplazar EC2; revisa el plan antes de aplicar. Los checks y la proteccion de `develop` se describen en [Forgejo Actions](docs/11-forgejo-actions-y-proteccion-develop.md).
 
 ---
 

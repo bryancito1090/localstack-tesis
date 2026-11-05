@@ -1,10 +1,10 @@
-name: Seguridad y Detección de Fuga de Secretos
+name: Seguridad de main
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ main ]
 
 jobs:
   security-audit:
@@ -34,7 +34,7 @@ jobs:
           fi
 
           echo "Ejecutando escaneo profundo de secretos en código e historial..."
-          gitleaks detect --source . --verbose --config .gitleaks.toml
+          gitleaks detect --source . --redact --config .gitleaks.toml
 
       - name: Validar Metadata de Pull Request
         if: github.event_name == 'pull_request'

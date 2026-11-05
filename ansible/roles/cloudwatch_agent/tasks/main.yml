@@ -1,0 +1,25 @@
+---
+- name: Instalar CloudWatch Agent
+  ansible.builtin.dnf:
+    name: amazon-cloudwatch-agent
+    state: present
+  notify: Aplicar configuracion CloudWatch Agent
+
+- name: Configurar envio de eventos y logs Nginx
+  ansible.builtin.template:
+    src: config.json.j2
+    dest: /opt/aws/amazon-cloudwatch-agent/etc/amazon-cloudwatch-agent.json
+    owner: root
+    group: root
+    mode: '0644'
+    validate: /usr/bin/python3 -m json.tool %s
+  notify: Aplicar configuracion CloudWatch Agent
+
+- name: Aplicar configuracion antes de iniciar el agente
+  ansible.builtin.meta: flush_handlers
+
+- name: Habilitar e iniciar CloudWatch Agent
+  ansible.builtin.systemd_service:
+    name: amazon-cloudwatch-agent
+    enabled: true
+    state: started

@@ -1,0 +1,54 @@
+---
+- name: Actualizar paquetes si se solicito mantenimiento # noqa: package-latest
+  ansible.builtin.dnf:
+    name: '*'
+    state: latest
+  when: common_upgrade_packages | bool
+
+- name: Instalar dependencias base
+  ansible.builtin.dnf:
+    name:
+      - python3
+      - curl
+      - logrotate
+    state: present
+
+- name: Crear grupo del portal
+  ansible.builtin.group:
+    name: '{{ portal_app_user }}'
+    system: true
+
+- name: Crear usuario sin acceso interactivo
+  ansible.builtin.user:
+    name: '{{ portal_app_user }}'
+    group: '{{ portal_app_user }}'
+    home: '{{ portal_app_dir }}'
+    shell: /sbin/nologin
+    system: true
+    create_home: false
+
+- name: Crear directorio de aplicacion protegido contra escritura del servicio
+  ansible.builtin.file:
+    path: '{{ portal_app_dir }}'
+    state: directory
+    owner: root
+    group: '{{ portal_app_user }}'
+    mode: '0750'
+
+- name: Crear directorio de eventos
+  ansible.builtin.file:
+    path: '{{ portal_app_log_dir }}'
+    state: directory
+    owner: '{{ portal_app_user }}'
+    group: '{{ portal_app_user }}'
+    mode: '0750'
+
+- name: Crear archivo de eventos sin truncar el contenido
+  ansible.builtin.file:
+    path: '{{ portal_app_log_dir }}/app.log'
+    state: touch
+    owner: '{{ portal_app_user }}'
+    group: '{{ portal_app_user }}'
+    mode: '0640'
+    access_time: preserve
+    modification_time: preserve

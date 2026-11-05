@@ -1,0 +1,53 @@
+---
+- name: Desplegar la aplicacion del portal
+  ansible.builtin.copy:
+    src: app.py
+    dest: '{{ portal_app_dir }}/app.py'
+    owner: root
+    group: '{{ portal_app_user }}'
+    mode: '0640'
+  notify: Reiniciar portal
+
+- name: Crear secreto de sesion solo si no existe
+  ansible.builtin.command:
+    argv:
+      - /usr/bin/python3
+      - -c
+      - >-
+        import os, secrets;
+        fd = os.open({{ (portal_app_dir ~ '/session_secret') | to_json }}, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600);
+        os.write(fd, secrets.token_urlsafe(48).encode()); os.close(fd)
+    creates: '{{ portal_app_dir }}/session_secret'
+  no_log: true
+  notify: Reiniciar portal
+
+- name: Proteger el secreto de sesion
+  ansible.builtin.file:
+    path: '{{ portal_app_dir }}/session_secret'
+    owner: root
+    group: '{{ portal_app_user }}'
+    mode: '0640'
+
+- name: Instalar unidad systemd
+  ansible.builtin.template:
+    src: tesis-portal.service.j2
+    dest: /etc/systemd/system/tesis-portal.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Reiniciar portal
+
+- name: Configurar rotacion de eventos
+  ansible.builtin.template:
+    src: logrotate.j2
+    dest: /etc/logrotate.d/tesis-portal
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Habilitar e iniciar portal
+  ansible.builtin.systemd_service:
+    name: tesis-portal
+    enabled: true
+    state: started
+    daemon_reload: true

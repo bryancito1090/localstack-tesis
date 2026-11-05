@@ -1,0 +1,25 @@
+[Unit]
+Description=Portal corporativo de autenticacion de laboratorio
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory={{ portal_app_dir }}
+Environment={{ ('PORTAL_LOG_FILE=' ~ portal_app_log_dir ~ '/app.log') | to_json }}
+Environment={{ ('PORTAL_SESSION_SECRET_FILE=' ~ portal_app_dir ~ '/session_secret') | to_json }}
+Environment={{ ('PORTAL_ASSET_NAME=' ~ portal_app_asset_name) | to_json }}
+Environment=PYTHONDONTWRITEBYTECODE=1
+ExecStart=/usr/bin/python3 {{ portal_app_dir }}/app.py
+Restart=on-failure
+RestartSec=3
+User={{ portal_app_user }}
+Group={{ portal_app_user }}
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths={{ portal_app_log_dir }}
+
+[Install]
+WantedBy=multi-user.target

@@ -5,6 +5,8 @@
 .terraform.lock.hcl
 terraform.tfvars
 terraform.tfvars.json
+tfplan
+*.tfplan
 
 # Lambda build artifacts
 *.zip
@@ -23,3 +25,11 @@ __pycache__/
 # Backups and logs
 *.log
 backup_*/
+
+# Ansible: inventario local, secretos y dependencias
+ansible/inventory/hosts.yml
+ansible/inventory/hosts.json
+.venv/
+.ansible/
+*.retry
+ansible/**/vault*.yml

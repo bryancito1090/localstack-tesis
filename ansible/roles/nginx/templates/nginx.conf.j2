@@ -1,0 +1,25 @@
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log warn;
+pid /run/nginx.pid;
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    server_tokens off;
+    sendfile on;
+    keepalive_timeout 30;
+    client_max_body_size 16k;
+
+    log_format portal_json escape=json
+        '{"timestamp":"$time_iso8601","source_ip":"$remote_addr",'
+        '"method":"$request_method","uri":"$uri",'
+        '"status":$status,"bytes":$body_bytes_sent,"request_time":$request_time}';
+
+    include /etc/nginx/conf.d/*.conf;
+}

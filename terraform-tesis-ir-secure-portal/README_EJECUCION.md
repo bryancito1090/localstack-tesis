@@ -59,6 +59,8 @@ Activa `enable_s3_data_events=true` solo cuando vayas a probar EXFILTRATION. Act
 
 ## Uso
 
+Terraform aprovisiona AWS y despues [Ansible](../ansible/README.md) instala el portal, Nginx y CloudWatch Agent. Tras `terraform apply`, genera el inventario y ejecuta `ansible/playbook.yml` antes de probar el portal. La migracion desde el `user_data` anterior puede reemplazar EC2; revisa el plan.
+
 Copia el ejemplo:
 
 ```powershell
