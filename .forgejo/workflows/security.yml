@@ -19,6 +19,9 @@ jobs:
           persist-credentials: false
           github-server-url: https://git.bryan-bano.com
       - uses: https://github.com/astral-sh/setup-uv@v6
+        with:
+          github-token: ''
+          enable-cache: false
       - name: Validar rama, issue, milestone, etiquetas y commits
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -35,6 +38,9 @@ jobs:
           persist-credentials: false
           github-server-url: https://git.bryan-bano.com
       - uses: https://github.com/astral-sh/setup-uv@v6
+        with:
+          github-token: ''
+          enable-cache: false
       - name: Instalar dependencias y coleccion AWS
         run: |
           uv venv --python 3.12 .venv
