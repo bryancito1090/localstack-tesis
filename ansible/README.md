@@ -16,6 +16,8 @@ aws sts get-caller-identity
 
 Para SSM instala [Session Manager plugin](https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html). Las credenciales provienen del perfil AWS local (`AWS_PROFILE` si usas uno con nombre); no se copian al inventario ni al portal.
 
+El bootstrap y el rol base usan `curl-minimal`, el paquete predeterminado de Amazon Linux 2023. Instalar `curl` sobre esa AMI provoca un conflicto DNF; la variante minima cubre las transferencias HTTPS requeridas por SSM ([documentacion AWS](https://docs.aws.amazon.com/linux/al2023/ug/curl-minimal.html)).
+
 ## Despliegue
 
 ```bash
