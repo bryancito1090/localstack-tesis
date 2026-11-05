@@ -356,6 +356,17 @@ def analyze_cloudtrail(event_json: dict, config: dict):
     thresholds = config.get("thresholds", {})
     allowed_ips = config.get("authorized_ips", [])
 
+    # La contencion escribe su propia evidencia; no realimentar sus llamadas IAM.
+    identity = event_json.get("userIdentity", {}) or {}
+    issuer = ((identity.get("sessionContext") or {}).get("sessionIssuer") or {}).get("arn")
+    if (
+        event_source == "iam.amazonaws.com"
+        and identity.get("type") == "AssumedRole"
+        and event_name in {"ListAccessKeys", "UpdateAccessKey", "PutUserPolicy"}
+        and issuer in config.get("automated_response_role_arns", [])
+    ):
+        return None
+
     # Incidente 1: fuerza bruta por ConsoleLogin fallido.
     if event_name == "ConsoleLogin":
         response = event_json.get("responseElements", {}) or {}
@@ -419,6 +430,8 @@ def analyze_cloudtrail(event_json: dict, config: dict):
         "UpdateAssumeRolePolicy",
     }
     if event_source == "iam.amazonaws.com" and event_name in iam_critical_events:
+        if username in config.get("authorized_admin_users", []) and ip_in_cidrs(source_ip, allowed_ips):
+            return None
         request_params = event_json.get("requestParameters", {}) or {}
         target_policy_arn = request_params.get("policyArn") or request_params.get("policyDocument", "")
         window = current_window(5)

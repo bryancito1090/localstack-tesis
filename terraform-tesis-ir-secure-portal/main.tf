@@ -436,7 +436,8 @@ resource "aws_s3_object" "detector_config" {
     critical_policies = [
       aws_iam_policy.critical_policy.name
     ]
-    authorized_admin_users = var.authorized_admin_users
+    authorized_admin_users       = var.authorized_admin_users
+    automated_response_role_arns = [aws_iam_role.playbook_revoke_credentials.arn]
     thresholds = {
       console_login_failures_same_user_5m = var.threshold_console_login_failures_same_user_5m
       console_login_failures_same_ip_5m   = var.threshold_console_login_failures_same_ip_5m
