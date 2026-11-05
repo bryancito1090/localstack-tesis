@@ -102,3 +102,9 @@ Cuando un incidente supera los umbrales de detección, la función `save_inciden
    - Si el incidente es de red (`BRUTE_FORCE`, `PORT_SCAN`), publica a `tesis-ir-playbook-block-ip-queue`.
    - Si el incidente es de credenciales (`PRIVILEGE_ESCALATION`, `CREDENTIAL_LEAK`), publica a `tesis-ir-playbook-revoke-credentials-queue`.
 5. **Métricas en CloudWatch:** Emite un punto métrico con Namespace `TesisIR`, nombre `IncidentDetected` y dimensiones por tipo de incidente y severidad.
+
+## Administracion autorizada y acciones de respuesta
+
+Una accion IAM critica no genera escalada si el actor esta en `authorized_admin_users` **y** su IP pertenece a `authorized_ips`. Configura el usuario real del despliegue en tu `terraform.tfvars` privado (por ejemplo `authorized_admin_users = ["admin-tesis"]`) y conserva tu IP actual autorizada. El mismo usuario desde otra IP sigue sujeto a deteccion de escalada/fuga de credenciales.
+
+Terraform publica el ARN del rol del playbook de revocacion en `automated_response_role_arns`. El detector excluye unicamente sus llamadas IAM esperadas (`ListAccessKeys`, `UpdateAccessKey`, `PutUserPolicy`), verificando la identidad `AssumedRole` y el ARN del emisor. Esto evita que la contencion genere incidentes recursivos; las acciones del playbook conservan su auditoria en S3/CloudTrail. Otras operaciones y otros roles siguen siendo evaluados.
