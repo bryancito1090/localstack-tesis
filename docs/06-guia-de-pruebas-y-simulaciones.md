@@ -2,6 +2,8 @@
 
 Esta guía detalla el procedimiento paso a paso para simular y validar de manera controlada los 5 tipos de incidentes soportados por la arquitectura en AWS.
 
+> Para una campaña del TIC, aplicar primero el [plan de evaluación cuantitativa](12-plan-evaluacion-cuantitativa-tic.md): define actores desechables, ventanas, controles, recuperación y evidencia. Los ejemplos siguientes son guiones funcionales originales, no un protocolo estadístico. No provocar revocaciones usando el usuario administrativo del despliegue; el detector señala al actor de la llamada y un administrador autorizado desde una IP permitida está exento.
+
 ---
 
 ## 1. Preparación del Entorno

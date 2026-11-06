@@ -2,6 +2,8 @@
 
 La gestion de configuracion ya esta implementada: [Ansible y despliegue del portal](../ansible/README.md), [Forgejo Actions y proteccion de develop](11-forgejo-actions-y-proteccion-develop.md).
 
+Para medir y sustentar los resultados del TIC: [plan de evaluación cuantitativa](12-plan-evaluacion-cuantitativa-tic.md), con fórmulas, escenarios, tamaños de muestra, límites de instrumentación y [plantillas CSV](plantillas-metricas/).
+
 **Trabajo de Integración Curricular (Tesis de Grado)**  
 **Tema:** Diseño e Implementación de un Sistema de Detección y Respuesta ante Incidentes de Seguridad en Entornos Cloud (AWS)  
 **Autor Principal (Componente C - Automatización de Respuesta):** Bryan Baño  
@@ -101,6 +103,8 @@ La documentación se organiza de forma modular para facilitar su lectura académ
 | [`08-estrategia-costos-y-entornos.md`](file:///home/bryan/Projects/LOCALSTACK/localstack-tesis/docs/08-estrategia-costos-y-entornos.md) | **Estrategia de Costos y Entornos** | Diseño serverless de costo cero o ultra-bajo en AWS (< $5/mes), control de presupuesto con AWS Budgets y relación con el entorno emulado LocalStack. |
 | [`09-integracion-ansible-gestion-configuracion.md`](file:///home/bryan/Projects/LOCALSTACK/localstack-tesis/docs/09-integracion-ansible-gestion-configuracion.md) | **Integración de Ansible (Configuration Management)** | Diseño y arquitectura modular de Ansible para reemplazar `user_data`, roles (`common`, `nginx`, `portal_app`, `cloudwatch_agent`) y plan de migración. |
 | [`10-guia-configuracion-aws-cuenta-nueva-y-forgejo.md`](file:///home/bryan/Projects/LOCALSTACK/localstack-tesis/docs/10-guia-configuracion-aws-cuenta-nueva-y-forgejo.md) | **Guía Operativa: Nueva Cuenta AWS y Forgejo** | Manual detallado paso a paso para aprovisionar credenciales IAM en la nueva cuenta de AWS, configuración local segura y migración a Forgejo. |
+| [11-forgejo-actions-y-proteccion-develop.md](11-forgejo-actions-y-proteccion-develop.md) | **Forgejo Actions y protección de develop** | Checks obligatorios y flujo de integración. |
+| [12-plan-evaluacion-cuantitativa-tic.md](12-plan-evaluacion-cuantitativa-tic.md) | **Evaluación cuantitativa del TIC** | Métricas, método experimental, comparación manual/automática, evidencia, consultas y criterios propuestos. |
 
 ---
 
@@ -108,5 +112,5 @@ La documentación se organiza de forma modular para facilitar su lectura académ
 
 - **Código Terraform:** Ubicado en [`terraform-tesis-ir-secure-portal/`](file:///home/bryan/Projects/LOCALSTACK/localstack-tesis/terraform-tesis-ir-secure-portal/) (listo para `terraform init` y `terraform apply`).
 - **Playbooks Serverless:** Ubicados en [`terraform-tesis-ir-secure-portal/playbooks/`](file:///home/bryan/Projects/LOCALSTACK/localstack-tesis/terraform-tesis-ir-secure-portal/playbooks/).
-- **Portal Web y Agente de Telemetría:** Plantilla bash de inicialización en [`terraform-tesis-ir-secure-portal/scripts/user_data.sh.tpl`](file:///home/bryan/Projects/LOCALSTACK/localstack-tesis/terraform-tesis-ir-secure-portal/scripts/user_data.sh.tpl).
+- **Portal Web y Agente de Telemetría:** Roles de [Ansible](../ansible/README.md); `user_data` conserva el bootstrap mínimo.
 - **Ramas permanentes:** `main` (producción) y `develop` (integración y desarrollo activo).

@@ -170,6 +170,8 @@ ansible-playbook playbook.yml
 
 El primer cambio de `user_data` puede reemplazar EC2; revisa el plan antes de aplicar. Los checks y la proteccion de `develop` se describen en [Forgejo Actions](docs/11-forgejo-actions-y-proteccion-develop.md).
 
+Para las mediciones del TIC consulta el [plan de evaluación cuantitativa](docs/12-plan-evaluacion-cuantitativa-tic.md): tiempos HTTP, detección y contención, calidad, comparación manual/automática y plantillas de evidencia. Si cambias de red, sigue [la guía de Ansible](ansible/README.md#cambio-de-red-o-vpn) para actualizar el acceso y las IP autorizadas.
+
 ---
 
 ## 7. Ejecución de Pruebas de Incidentes

@@ -1,0 +1,1 @@
+run_id,trial_id,scenario,mode,ground_truth,expected_incident_type,expected_playbooks,t_first_utc,t_eligible_utc,deadline_utc,detected_incident_ids,observed_incident_types,detected_in_window,containment_applicable,containment_verified,classification,trial_status,evidence_uri,notes
