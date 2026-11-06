@@ -93,6 +93,17 @@ aws logs tail "$LOG_GROUP" --since 10m --follow --region us-east-2
 
 Para verificar la cadena completa sigue [las pruebas de incidentes](../terraform-tesis-ir-secure-portal/GUIA_PRUEBAS_INCIDENTES.md) y conserva evidencia de CloudWatch, Lambda, SQS y mitigacion. La fuerza bruta puede bloquear la IP de prueba en la NACL.
 
+## Cambio de red o VPN
+
+El portal limita HTTP al CIDR configurado y el detector evalua las APIs de identidad desde IPs no autorizadas. Si cambias de red:
+
+1. Comprueba tu salida con `curl -fsS https://checkip.amazonaws.com`. Si el navegador usa una VPN/proxy diferente, abre esa misma direccion desde el navegador para comprobar su IP de salida.
+2. Antes de ejecutar comandos de identidad desde la nueva red, usa la sesion de administracion/recuperacion disponible para agregar temporalmente el nuevo `/32` a `authorized_ips` en S3, objeto `config/authorized_ips.json` del bucket de evidencia. Conserva los demas campos y la IP anterior durante la transicion. Esto evita tratar el cambio de red como fuga de credenciales.
+3. Actualiza el `ssh_allowed_cidr` de tu `terraform.tfvars` privado. Si `http_allowed_cidrs` o `authorized_ip_cidrs` contienen listas explicitas, revisalas tambien; si estan vacias, heredan ese CIDR. Revisa `terraform plan` y aplica el cambio. El estado final debe coincidir con Terraform y retirar la autorizacion transitoria que ya no corresponda.
+4. Verifica `/health` y el login. Si hay una regla NACL de bloqueo para tu IP por un ensayo anterior, identifica su origen antes de retirarla; no elimines bloqueos de otros origenes. Un cambio normal de red no requiere recrear EC2 ni repetir Ansible.
+
+La IP publica de EC2 tambien puede cambiar tras detener/iniciar la instancia; comprueba `terraform output -raw portal_url`. Para evaluar latencias, registra cada red como un bloque distinto en el [plan cuantitativo del TIC](../docs/12-plan-evaluacion-cuantitativa-tic.md).
+
 ## Validacion sin AWS
 
 ```bash
