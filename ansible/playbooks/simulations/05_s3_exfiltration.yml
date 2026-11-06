@@ -1,0 +1,65 @@
+---
+- name: "Simulacion Red Team - Incidente 05: Exfiltracion de Datos S3 (EXFILTRATION)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Notificar inicio de la prueba de exfiltracion
+      ansible.builtin.debug:
+        msg:
+          - "=== INICIO SIMULACION EXFILTRACION DE DATOS S3 (EXFILTRATION) ==="
+          - "Bucket Sensible: s3://{{ sensitive_bucket }}"
+          - "Ruta del recurso: sensible/clientes_demo.json"
+          - "Umbral requerido: Mas de 50 peticiones GetObject en ventana de 1 hora"
+          - "Condicion previa: enable_s3_data_events = true en terraform.tfvars"
+
+    - name: Asegurar que el archivo sensible simulado existe en el bucket
+      ansible.builtin.command: >
+        aws s3 cp - "s3://{{ sensitive_bucket }}/sensible/clientes_demo.json"
+      args:
+        stdin: '{"clientes_vip": [{"id": 1, "nombre": "Empresa Demo S.A.", "saldo": 540000}]}'
+      changed_when: false
+
+    - name: Ejecutar rafaga de 55 descargas consecutivas (GetObject)
+      ansible.builtin.command:
+        cmd: |
+          {{ ansible_playbook_python }} -c '
+          import boto3
+          s3 = boto3.client("s3", region_name="{{ aws_region }}")
+          for _ in range(55):
+              s3.get_object(Bucket="{{ sensitive_bucket }}", Key="sensible/clientes_demo.json")
+          '
+      register: s3_downloads
+      changed_when: false
+
+    - name: Consultar incidentes de EXFILTRATION en DynamoDB
+      ansible.builtin.command: >
+        aws dynamodb scan
+        --table-name {{ dynamodb_incidents_table }}
+        --expression-attribute-names '{"#tp":"type"}'
+        --expression-attribute-values '{":t":{"S":"EXFILTRATION"}}'
+        --filter-expression "#tp = :t"
+        --region {{ aws_region }}
+        --output json
+      register: ddb_exfil_raw
+      changed_when: false
+
+    - name: Parsear registros de DynamoDB
+      ansible.builtin.set_fact:
+        ddb_exfil_items: "{{ (ddb_exfil_raw.stdout | from_json).Items | default([]) }}"
+
+    - name: Resumen ejecutivo del resultado
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - "               REPORTE FINAL DE LA PRUEBA"
+          - "=========================================================="
+          - "Tipo de incidente: EXFILTRATION"
+          - "Descargas GetObject ejecutadas: 55"
+          - "Total Incidentes EXFILTRATION en DynamoDB: {{ ddb_exfil_items | length }}"
+          - "Evidencia S3: s3://{{ evidence_bucket }}/incident-05-exfiltration/"
+          - "=========================================================="

@@ -1,0 +1,146 @@
+---
+- name: "Rollback y Limpieza Automatizada del Laboratorio de Seguridad (Zero-State)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Notificar inicio de la restauracion
+      ansible.builtin.debug:
+        msg:
+          - "=== INICIO ROLLBACK Y LIMPIEZA AUTOMATIZADA ==="
+          - "Objetivo: Restaurar el entorno de laboratorio al estado base limpio (Zero-State)"
+
+    # 1. Limpieza de Identidad IAM Temporal
+    - name: Verificar existencia de usuario temporal IAM
+      ansible.builtin.command: >
+        aws iam get-user --user-name {{ test_iam_username }}
+      register: iam_user_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Bloque de limpieza IAM temporal
+      when: iam_user_check.rc == 0
+      block:
+        - name: Retirar politica inline de contencion EmergencyDenyAll
+          ansible.builtin.command: >
+            aws iam delete-user-policy
+            --user-name {{ test_iam_username }}
+            --policy-name {{ emergency_deny_policy_name }}
+          ignore_errors: true
+          register: iam_del_emergency
+          changed_when: iam_del_emergency.rc == 0
+
+        - name: Desasociar politica ReadOnlyAccess
+          ansible.builtin.command: >
+            aws iam detach-user-policy
+            --user-name {{ test_iam_username }}
+            --policy-arn {{ test_escalation_policy_arn }}
+          ignore_errors: true
+          register: iam_detach_ro
+          changed_when: iam_detach_ro.rc == 0
+
+        - name: Listar y eliminar claves de acceso del usuario temporal
+          ansible.builtin.command: >
+            aws iam list-access-keys --user-name {{ test_iam_username }} --output json
+          register: access_keys_raw
+          changed_when: false
+
+        - name: Eliminar claves de acceso asociadas
+          ansible.builtin.command: >
+            aws iam delete-access-key
+            --user-name {{ test_iam_username }}
+            --access-key-id {{ item.AccessKeyId }}
+          loop: "{{ (access_keys_raw.stdout | from_json).AccessKeyMetadata | default([]) }}"
+          when: (access_keys_raw.stdout | from_json).AccessKeyMetadata is defined
+          changed_when: true
+
+        - name: Eliminar usuario temporal IAM
+          ansible.builtin.command: >
+            aws iam delete-user --user-name {{ test_iam_username }}
+          register: iam_delete_user
+          changed_when: iam_delete_user.rc == 0
+
+        - name: Confirmar limpieza IAM
+          ansible.builtin.debug:
+            msg: "Usuario IAM temporal {{ test_iam_username }} y sus politicas fueron eliminados."
+
+    # 2. Desbloqueo de Red (Network ACL)
+    - name: Obtener reglas activas de la Network ACL
+      ansible.builtin.command: >
+        aws ec2 describe-network-acls
+        --network-acl-ids {{ nacl_id }}
+        --region {{ aws_region }}
+        --output json
+      register: nacl_status_raw
+      changed_when: false
+
+    - name: Identificar reglas DENY temporales (numeros 1 a 99)
+      ansible.builtin.set_fact:
+        temp_deny_rules: >-
+          {{
+            ((nacl_status_raw.stdout | from_json).NetworkAcls[0].Entries)
+            | selectattr('Egress', 'equalto', false)
+            | selectattr('RuleAction', 'equalto', 'deny')
+            | selectattr('RuleNumber', 'lt', 100)
+            | map(attribute='RuleNumber')
+            | list
+          }}
+
+    - name: Notificar reglas DENY a eliminar de la Network ACL
+      ansible.builtin.debug:
+        msg: "Reglas de bloqueo identificadas en NACL: {{ temp_deny_rules }}"
+      when: temp_deny_rules | length > 0
+
+    - name: Eliminar reglas DENY temporales de la Network ACL
+      ansible.builtin.command: >
+        aws ec2 delete-network-acl-entry
+        --network-acl-id {{ nacl_id }}
+        --rule-number {{ item }}
+        --ingress
+        --region {{ aws_region }}
+      loop: "{{ temp_deny_rules }}"
+      when: temp_deny_rules | length > 0
+      register: nacl_deleted_rules
+      changed_when: true
+
+    # 3. Reinicio de Servicio Web en EC2 para limpiar bloqueos en memoria
+    - name: Reiniciar servicio tesis-portal via AWS SSM para limpiar memoria de bloqueos
+      ansible.builtin.command: >
+        aws ssm send-command
+        --instance-ids {{ portal_instance_id }}
+        --document-name "AWS-RunShellScript"
+        --parameters 'commands=["systemctl restart tesis-portal"]'
+        --region {{ aws_region }}
+        --output json
+      register: ssm_restart_cmd
+      changed_when: true
+
+    - name: Esperar 5 segundos tras reinicio
+      ansible.builtin.pause:
+        seconds: 5
+
+    # 4. Verificacion de Salud Final
+    - name: Verificar restablecimiento del acceso al portal web
+      ansible.builtin.uri:
+        url: "{{ portal_url }}/health"
+        status_code: 200
+        return_content: true
+      register: final_health_check
+      retries: 5
+      delay: 2
+
+    - name: Resumen de restauracion completada
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - "           ESTADO DEL LABORATORIO RESTAURADO"
+          - "=========================================================="
+          - "NACL: Reglas de bloqueo DENY temporales eliminadas"
+          - "IAM: Usuario temporal y EmergencyDenyAll eliminados"
+          - "Portal Web: Memoria reiniciada y servicio 100% operativo"
+          - "Health Check: {{ final_health_check.json.status }} (Version: {{ final_health_check.json.version }})"
+          - "=========================================================="

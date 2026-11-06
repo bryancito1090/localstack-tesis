@@ -1,0 +1,90 @@
+---
+- name: "Simulacion Red Team - Incidente 03: Escalada de Privilegios (PRIVILEGE_ESCALATION)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Notificar inicio de la prueba de escalada
+      ansible.builtin.debug:
+        msg:
+          - "=== INICIO SIMULACION ESCALADA DE PRIVILEGIOS (PRIVILEGE_ESCALATION) ==="
+          - "Usuario de prueba temporal: {{ test_iam_username }}"
+          - "Politica detonante: {{ test_escalation_policy_arn }}"
+          - "Accion esperada: CloudTrail -> Lambda -> Playbook revoke-credentials"
+          - "Resultado esperado de contencion: Adjuncion de EmergencyDenyAll"
+
+    - name: Verificar si el usuario temporal ya existe
+      ansible.builtin.command: >
+        aws iam get-user --user-name {{ test_iam_username }}
+      register: iam_get_user
+      ignore_errors: true
+      changed_when: false
+
+    - name: Crear usuario IAM temporal si no existe
+      ansible.builtin.command: >
+        aws iam create-user --user-name {{ test_iam_username }}
+      when: iam_get_user.rc != 0
+      register: iam_create_res
+      changed_when: true
+
+    - name: Adjuntar politica administrativa para detonar la escalada
+      ansible.builtin.command: >
+        aws iam attach-user-policy
+        --user-name {{ test_iam_username }}
+        --policy-arn {{ test_escalation_policy_arn }}
+      register: iam_attach_res
+      changed_when: true
+
+    - name: Notificar detonador exitoso
+      ansible.builtin.debug:
+        msg:
+          - "Evento de escalada generado en AWS CloudTrail: AttachUserPolicy"
+          - "Esperando captura y ejecucion automatica del playbook revoke-credentials..."
+
+    - name: Esperar procesamiento de CloudTrail y ejecucion de la contencion
+      ansible.builtin.pause:
+        seconds: 20
+        prompt: "Esperando propagacion y contencion automatica en IAM (20s)..."
+
+    - name: Verificar si la contencion EmergencyDenyAll fue aplicada
+      ansible.builtin.command: >
+        aws iam get-user-policy
+        --user-name {{ test_iam_username }}
+        --policy-name {{ emergency_deny_policy_name }}
+      register: emergency_policy_check
+      ignore_errors: true
+      changed_when: false
+
+    - name: Consultar incidentes de PRIVILEGE_ESCALATION en DynamoDB
+      ansible.builtin.command: >
+        aws dynamodb scan
+        --table-name {{ dynamodb_incidents_table }}
+        --expression-attribute-names '{"#tp":"type"}'
+        --expression-attribute-values '{":t":{"S":"PRIVILEGE_ESCALATION"}}'
+        --filter-expression "#tp = :t"
+        --region {{ aws_region }}
+        --output json
+      register: ddb_escalation_raw
+      changed_when: false
+
+    - name: Parsear registros de DynamoDB
+      ansible.builtin.set_fact:
+        ddb_escalation_items: "{{ (ddb_escalation_raw.stdout | from_json).Items | default([]) }}"
+
+    - name: Resumen ejecutivo del resultado
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - "               REPORTE FINAL DE LA PRUEBA"
+          - "=========================================================="
+          - "Tipo de incidente: PRIVILEGE_ESCALATION"
+          - "Usuario objetivo: {{ test_iam_username }}"
+          - "Estado Contencion EmergencyDenyAll: {{ 'APLICADA EXITOSAMENTE' if emergency_policy_check.rc == 0 else 'PENDIENTE DE PROPAGACION' }}"
+          - "Total Incidentes PRIVILEGE_ESCALATION en DynamoDB: {{ ddb_escalation_items | length }}"
+          - "Evidencia S3: s3://{{ evidence_bucket }}/incident-03-privilege-escalation/"
+          - "Para limpiar este usuario ejecuta: ansible-playbook rollback_cleanup.yml"
+          - "=========================================================="

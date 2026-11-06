@@ -1,0 +1,122 @@
+---
+- name: "Simulacion Red Team - Incidente 01: Fuerza Bruta (BRUTE_FORCE)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Determinar direccion IP publica del atacante
+      ansible.builtin.uri:
+        url: https://checkip.amazonaws.com
+        return_content: true
+      register: attacker_ip_req
+      retries: 3
+      delay: 2
+
+    - name: Fijar IP publica del atacante
+      ansible.builtin.set_fact:
+        attacker_ip: "{{ attacker_ip_req.content | trim }}"
+
+    - name: Notificar inicio de la prueba
+      ansible.builtin.debug:
+        msg:
+          - "=== INICIO SIMULACION FUERZA BRUTA (BRUTE_FORCE) ==="
+          - "Destino: {{ portal_url }}/login"
+          - "IP Atacante: {{ attacker_ip }}"
+          - "Usuario objetivo: admin.demo"
+          - "Umbral requerido: 5 intentos fallidos en ventana de 5 minutos"
+
+    - name: Ejecutar 4 intentos fallidos iniciales
+      ansible.builtin.uri:
+        url: "{{ portal_url }}/login"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          username: "admin.demo"
+          password: "InvalidPassword{{ item }}"
+        status_code: [200, 302]
+        return_content: true
+      loop: [1, 2, 3, 4]
+      register: failed_attempts
+      delay: 1
+
+    - name: Ejecutar 5to intento y comprobar bloqueo defensivo (HTTP 403)
+      ansible.builtin.uri:
+        url: "{{ portal_url }}/login"
+        method: POST
+        body_format: form-urlencoded
+        body:
+          username: "admin.demo"
+          password: "TriggerBlockedAttempt5"
+        status_code: 403
+        return_content: true
+      register: lockout_response
+
+    - name: Verificar que la pantalla de bloqueo responde con 403
+      ansible.builtin.assert:
+        that:
+          - lockout_response.status == 403
+          - "'Acceso bloqueado temporalmente' in lockout_response.content"
+        fail_msg: "El portal no activo la respuesta defensiva 403 tras 5 fallos."
+        success_msg: "El portal activo exitosamente la contencion 403 en memoria."
+
+    - name: Esperar procesamiento de CloudWatch Logs y Lambda Detector
+      ansible.builtin.pause:
+        seconds: 15
+        prompt: "Esperando propagacion de telemetria hacia Lambda y Playbooks (15s)..."
+
+    - name: Consultar incidente registrado en DynamoDB
+      ansible.builtin.command: >
+        aws dynamodb scan
+        --table-name {{ dynamodb_incidents_table }}
+        --expression-attribute-names '{"#tp":"type"}'
+        --expression-attribute-values '{":t":{"S":"BRUTE_FORCE"}}'
+        --filter-expression "#tp = :t"
+        --region {{ aws_region }}
+        --output json
+      register: ddb_incidents_raw
+      changed_when: false
+
+    - name: Parsear registros de DynamoDB
+      ansible.builtin.set_fact:
+        ddb_items: "{{ (ddb_incidents_raw.stdout | from_json).Items | default([]) }}"
+
+    - name: Consultar reglas de Network ACL en AWS
+      ansible.builtin.command: >
+        aws ec2 describe-network-acls
+        --network-acl-ids {{ nacl_id }}
+        --region {{ aws_region }}
+        --output json
+      register: nacl_raw
+      changed_when: false
+
+    - name: Parsear reglas de Network ACL
+      ansible.builtin.set_fact:
+        nacl_entries: "{{ ((nacl_raw.stdout | from_json).NetworkAcls[0].Entries) | default([]) }}"
+
+    - name: Identificar reglas DENY activas
+      ansible.builtin.set_fact:
+        nacl_deny_rules: >-
+          {{
+            nacl_entries | selectattr('Egress', 'equalto', false)
+                         | selectattr('RuleAction', 'equalto', 'deny')
+                         | rejectattr('RuleNumber', 'equalto', 32767)
+                         | list
+          }}
+
+    - name: Resumen ejecutivo del resultado
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - "               REPORTE FINAL DE LA PRUEBA"
+          - "=========================================================="
+          - "Tipo de incidente: BRUTE_FORCE"
+          - "IP Atacante: {{ attacker_ip }}"
+          - "Resultado Portal: HTTP 403 Lockout Exitoso"
+          - "Total Incidentes BRUTE_FORCE en DynamoDB: {{ ddb_items | length }}"
+          - "Reglas DENY Ingress en Network ACL: {{ nacl_deny_rules | length }}"
+          - "Evidencia S3: s3://{{ evidence_bucket }}/incident-01-bruteforce/"
+          - "=========================================================="

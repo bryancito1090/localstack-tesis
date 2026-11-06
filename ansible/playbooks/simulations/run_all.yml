@@ -1,0 +1,41 @@
+---
+# ==============================================================================
+# Suite Completa de Simulaciones Red Team y Restauracion Zero-State
+# Sistema IR Automatizado en AWS (TIC Tesis)
+#
+# Uso:
+#   - Ejecutar todo el ciclo con rollback final:
+#     ansible-playbook ansible/playbooks/simulations/run_all.yml
+#
+#   - Ejecutar solo un ataque especifico:
+#     ansible-playbook ansible/playbooks/simulations/run_all.yml --tags brute_force
+#     ansible-playbook ansible/playbooks/simulations/run_all.yml --tags port_scan
+#     ansible-playbook ansible/playbooks/simulations/run_all.yml --tags privilege_escalation
+#     ansible-playbook ansible/playbooks/simulations/run_all.yml --tags credential_leak
+#     ansible-playbook ansible/playbooks/simulations/run_all.yml --tags exfiltration
+#     ansible-playbook ansible/playbooks/simulations/run_all.yml --tags cleanup
+# ==============================================================================
+
+- name: "Ejecutar Simulacion: 01 Fuerza Bruta"
+  ansible.builtin.import_playbook: 01_brute_force.yml
+  tags: [brute_force, all]
+
+- name: "Ejecutar Simulacion: 02 Escaneo de Puertos"
+  ansible.builtin.import_playbook: 02_port_scan.yml
+  tags: [port_scan, all]
+
+- name: "Ejecutar Simulacion: 03 Escalada de Privilegios"
+  ansible.builtin.import_playbook: 03_privilege_escalation.yml
+  tags: [privilege_escalation, all]
+
+- name: "Ejecutar Simulacion: 04 Fuga de Credenciales"
+  ansible.builtin.import_playbook: 04_credential_leak.yml
+  tags: [credential_leak, all]
+
+- name: "Ejecutar Simulacion: 05 Exfiltracion S3"
+  ansible.builtin.import_playbook: 05_s3_exfiltration.yml
+  tags: [exfiltration, all]
+
+- name: "Ejecutar Rollback y Limpieza Zero-State"
+  ansible.builtin.import_playbook: rollback_cleanup.yml
+  tags: [cleanup, rollback, all]

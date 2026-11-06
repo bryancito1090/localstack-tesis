@@ -1,0 +1,104 @@
+---
+- name: "Simulacion Red Team - Incidente 02: Escaneo de Puertos (PORT_SCAN)"
+  hosts: localhost
+  connection: local
+  gather_facts: false
+
+  vars_files:
+    - vars.yml
+
+  tasks:
+    - name: Determinar direccion IP publica del atacante
+      ansible.builtin.uri:
+        url: https://checkip.amazonaws.com
+        return_content: true
+      register: attacker_ip_req
+      retries: 3
+      delay: 2
+
+    - name: Fijar IP publica del atacante
+      ansible.builtin.set_fact:
+        attacker_ip: "{{ attacker_ip_req.content | trim }}"
+
+    - name: Notificar inicio de la prueba de escaneo
+      ansible.builtin.debug:
+        msg:
+          - "=== INICIO SIMULACION ESCANEO DE PUERTOS (PORT_SCAN) ==="
+          - "Destino: {{ portal_public_ip }}"
+          - "Rango de puertos objetivo: TCP 81 a 92 (Puertos cerrados)"
+          - "IP Atacante: {{ attacker_ip }}"
+          - "Objetivo de telemetria: Generar paquetes REJECT en VPC Flow Logs"
+
+    - name: Ejecutar sondeo TCP sobre puertos cerrados (81-92)
+      ansible.builtin.command:
+        cmd: |
+          python3 -c '
+          import socket
+          for p in range(81, 93):
+              s = socket.socket()
+              s.settimeout(0.2)
+              s.connect_ex(("{{ portal_public_ip }}", p))
+              s.close()
+          '
+      register: port_scan_output
+      changed_when: false
+
+    - name: Mostrar resumen del escaneo enviado
+      ansible.builtin.debug:
+        msg: "{{ port_scan_output.stdout_lines }}"
+
+    - name: Explicar ventana de agregacion de VPC Flow Logs
+      ansible.builtin.debug:
+        msg:
+          - "Nota: AWS VPC Flow Logs tiene un intervalo de agregacion tipico de 1 a 3 minutos."
+          - "El detector Lambda procesara los registros REJECT agrupados en la tabla DynamoDB."
+
+    - name: Consultar incidentes de PORT_SCAN en DynamoDB
+      ansible.builtin.command: >
+        aws dynamodb scan
+        --table-name {{ dynamodb_incidents_table }}
+        --expression-attribute-names '{"#tp":"type"}'
+        --expression-attribute-values '{":t":{"S":"PORT_SCAN"}}'
+        --filter-expression "#tp = :t"
+        --region {{ aws_region }}
+        --output json
+      register: ddb_portscan_raw
+      changed_when: false
+
+    - name: Parsear registros de DynamoDB
+      ansible.builtin.set_fact:
+        ddb_portscan_items: "{{ (ddb_portscan_raw.stdout | from_json).Items | default([]) }}"
+
+    - name: Consultar reglas de Network ACL en AWS
+      ansible.builtin.command: >
+        aws ec2 describe-network-acls
+        --network-acl-ids {{ nacl_id }}
+        --region {{ aws_region }}
+        --output json
+      register: nacl_raw
+      changed_when: false
+
+    - name: Identificar reglas DENY activas
+      ansible.builtin.set_fact:
+        nacl_deny_rules: >-
+          {{
+            ((nacl_raw.stdout | from_json).NetworkAcls[0].Entries)
+            | selectattr('Egress', 'equalto', false)
+            | selectattr('RuleAction', 'equalto', 'deny')
+            | rejectattr('RuleNumber', 'equalto', 32767)
+            | list
+          }}
+
+    - name: Resumen ejecutivo del resultado
+      ansible.builtin.debug:
+        msg:
+          - "=========================================================="
+          - "               REPORTE FINAL DE LA PRUEBA"
+          - "=========================================================="
+          - "Tipo de incidente: PORT_SCAN"
+          - "IP Atacante: {{ attacker_ip }}"
+          - "Puertos sondeados: 81 a 92"
+          - "Total Incidentes PORT_SCAN en DynamoDB: {{ ddb_portscan_items | length }}"
+          - "Reglas DENY Ingress en Network ACL: {{ nacl_deny_rules | length }}"
+          - "Evidencia S3: s3://{{ evidence_bucket }}/incident-02-port-scan/"
+          - "=========================================================="
