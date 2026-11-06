@@ -185,3 +185,16 @@ class PortalTest(unittest.TestCase):
             r"[\U00010000-\U0010ffff\u2600-\u27bf\u2300-\u23ff]", html_dash
         )
         self.assertEqual(dash_emojis, [])
+
+    def test_glassmorphism_login_styling(self):
+        status, _, data = self.request("GET", "/login")
+        self.assertEqual(status, 200)
+        html_login = data.decode("utf-8")
+        self.assertIn("glass-card", html_login)
+        self.assertIn("ambient-orb", html_login)
+        self.assertIn("glass-input", html_login)
+        self.assertIn("glass-btn-primary", html_login)
+        self.assertIn("glass-demo-pill", html_login)
+        self.assertIn("backdrop-filter", html_login)
+        self.assertIn("saturate", html_login)
+        self.assertIn("fillDemo", html_login)

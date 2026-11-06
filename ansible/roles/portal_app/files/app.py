@@ -107,6 +107,17 @@ SVG_ICONS = {
         '<path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12"'
         ' cy="7" r="4"/></svg>'
     ),
+    "lock": (
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+        ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>'
+        '<path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>'
+    ),
+    "arrow_right": (
+        '<svg class="icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"'
+        ' stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+        '<line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>'
+    ),
 }
 
 
@@ -704,59 +715,132 @@ class Handler(BaseHTTPRequestHandler):
         if message:
             kind = "critical" if error else "info"
             alert_html = f"""
-            <div class='badge {kind}' style='width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); margin-bottom: 16px; justify-content: center; text-transform: none; font-size: 13px;'>
+            <div class='badge {kind}' style='width: 100%; padding: 11px 16px; border-radius: var(--radius-sm); margin-bottom: 20px; justify-content: center; text-transform: none; font-size: 13px; font-weight: 600; backdrop-filter: blur(8px);'>
               {html_escape(message)}
             </div>
             """
 
+        icon_shield = SVG_ICONS["shield"]
+        icon_user = SVG_ICONS["user"]
+        icon_lock = SVG_ICONS["lock"]
+        icon_arrow = SVG_ICONS["arrow_right"]
+
         content = f"""
         <style>
-          .login-container {{
+          /* Escena y fondo Glassmorphism con iluminacion ambiental */
+          .login-scene {{
             min-height: calc(100vh - 64px);
             display: grid;
             place-items: center;
-            padding: 30px 20px;
-          }}
-          .login-card {{
-            width: 100%;
-            max-width: 440px;
-            background: var(--bg-surface);
-            border: 1px solid var(--border);
-            border-radius: var(--radius-lg);
-            padding: 36px 32px;
-            box-shadow: var(--shadow-card);
+            padding: 32px 20px;
             position: relative;
             overflow: hidden;
-            transition: background-color 0.2s var(--ease-snappy), border-color 0.2s var(--ease-snappy);
           }}
-          .login-card::before {{
-            content: '';
+          .ambient-orb {{
             position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 2px;
-            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            border-radius: 50%;
+            filter: blur(85px);
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.6;
+            animation: orb-drift 16s ease-in-out infinite alternate;
           }}
-          .login-header {{
-            margin-bottom: 24px;
+          .orb-1 {{
+            width: 340px;
+            height: 340px;
+            top: 15%;
+            left: calc(50% - 250px);
+            background: radial-gradient(circle, rgba(56, 189, 248, 0.35), rgba(37, 99, 235, 0.15));
+          }}
+          .orb-2 {{
+            width: 380px;
+            height: 380px;
+            bottom: 12%;
+            right: calc(50% - 270px);
+            background: radial-gradient(circle, rgba(99, 102, 241, 0.30), rgba(139, 92, 246, 0.12));
+            animation-delay: -6s;
+          }}
+          @keyframes orb-drift {{
+            0% {{ transform: translate(0, 0) scale(1); }}
+            50% {{ transform: translate(30px, -24px) scale(1.08); }}
+            100% {{ transform: translate(-24px, 30px) scale(0.96); }}
+          }}
+
+          /* Tarjeta Frosted Glassmorphism */
+          .glass-card {{
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 440px;
+            background: rgba(14, 20, 36, 0.65);
+            backdrop-filter: blur(24px) saturate(190%);
+            -webkit-backdrop-filter: blur(24px) saturate(190%);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 22px;
+            padding: 38px 34px;
+            box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.18),
+                        0 24px 60px -12px rgba(0, 0, 0, 0.7),
+                        0 0 0 1px rgba(255, 255, 255, 0.05);
+            transition: all 0.25s var(--ease-snappy);
+          }}
+          [data-theme="light"] .glass-card {{
+            background: rgba(255, 255, 255, 0.72);
+            border: 1px solid rgba(255, 255, 255, 0.85);
+            box-shadow: inset 0 1px 2px 0 rgba(255, 255, 255, 0.95),
+                        0 20px 48px -10px rgba(15, 23, 42, 0.12),
+                        0 0 0 1px rgba(15, 23, 42, 0.06);
+          }}
+          [data-theme="light"] .orb-1 {{
+            background: radial-gradient(circle, rgba(147, 197, 253, 0.65), rgba(191, 219, 254, 0.3));
+            opacity: 0.75;
+          }}
+          [data-theme="light"] .orb-2 {{
+            background: radial-gradient(circle, rgba(199, 210, 254, 0.55), rgba(224, 231, 255, 0.25));
+            opacity: 0.75;
+          }}
+
+          /* Cabecera de la tarjeta */
+          .glass-header {{
             text-align: center;
+            margin-bottom: 24px;
           }}
-          .login-title {{
-            font-size: 24px;
+          .glass-brand-badge {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 48px;
+            height: 48px;
+            border-radius: 14px;
+            background: linear-gradient(135deg, rgba(59, 130, 246, 0.22), rgba(56, 189, 248, 0.18));
+            border: 1px solid rgba(56, 189, 248, 0.35);
+            color: var(--accent-cyan);
+            margin-bottom: 14px;
+            box-shadow: 0 4px 16px rgba(56, 189, 248, 0.25);
+          }}
+          .glass-brand-badge svg {{
+            width: 24px;
+            height: 24px;
+          }}
+          .glass-title {{
+            font-size: 23px;
             font-weight: 800;
-            letter-spacing: -0.02em;
+            letter-spacing: -0.025em;
             margin-bottom: 6px;
+            color: var(--text-main);
           }}
-          .login-sub {{
+          .glass-sub {{
+            font-size: 13px;
             color: var(--text-muted);
-            font-size: 14px;
           }}
-          .form-group {{
+
+          /* Campos del formulario translúcidos */
+          .glass-form-group {{
             margin-bottom: 18px;
           }}
-          .form-label {{
-            display: block;
+          .glass-label {{
+            display: flex;
+            align-items: center;
+            gap: 6px;
             font-size: 12px;
             font-weight: 700;
             text-transform: uppercase;
@@ -764,139 +848,307 @@ class Handler(BaseHTTPRequestHandler):
             color: var(--text-muted);
             margin-bottom: 7px;
           }}
-          .form-input {{
+          .glass-label svg {{
+            width: 14px;
+            height: 14px;
+            opacity: 0.8;
+          }}
+          .glass-input-wrapper {{
+            position: relative;
+            display: flex;
+            align-items: center;
+          }}
+          .glass-input {{
             width: 100%;
-            padding: 13px 15px;
+            padding: 13px 16px;
             border-radius: var(--radius-sm);
-            border: 1px solid var(--border);
-            background: var(--bg-elevated);
+            border: 1px solid rgba(255, 255, 255, 0.10);
+            background: rgba(20, 28, 48, 0.55);
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
             color: var(--text-main);
             font-size: 14px;
             outline: none;
-            transition: all 0.16s var(--ease-snappy);
+            transition: all 0.18s var(--ease-snappy);
+            font-family: inherit;
           }}
-          .form-input:focus {{
+          [data-theme="light"] .glass-input {{
+            background: rgba(248, 250, 252, 0.75);
+            border: 1px solid rgba(15, 23, 42, 0.12);
+          }}
+          .glass-input:focus {{
             border-color: var(--accent-cyan);
-            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.18);
-            background: var(--bg-subtle);
+            box-shadow: 0 0 0 3px rgba(56, 189, 248, 0.22);
+            background: rgba(27, 38, 64, 0.75);
           }}
-          .btn-primary {{
+          [data-theme="light"] .glass-input:focus {{
+            background: rgba(255, 255, 255, 0.95);
+            box-shadow: 0 0 0 3px rgba(2, 132, 199, 0.18);
+          }}
+
+          /* Botón principal Glassmorphic */
+          .glass-btn-primary {{
             width: 100%;
-            padding: 13px 18px;
+            padding: 13px 20px;
             border-radius: var(--radius-sm);
-            border: 0;
-            background: var(--primary);
-            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.22);
+            background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+            color: #ffffff;
             font-size: 14px;
             font-weight: 700;
             letter-spacing: 0.02em;
-            box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35),
+                        0 10px 24px -4px rgba(37, 99, 235, 0.45);
             margin-top: 10px;
+            transition: all 0.18s var(--ease-snappy);
+            cursor: pointer;
           }}
-          .btn-primary:hover {{
-            background: var(--primary-hover);
+          .glass-btn-primary:hover {{
+            background: linear-gradient(135deg, #4f91fd 0%, #1d4ed8 100%);
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.45),
+                        0 14px 28px -4px rgba(37, 99, 235, 0.55);
+            transform: translateY(-1px);
           }}
-          .demo-pills-box {{
-            margin-top: 26px;
+          .glass-btn-primary:active {{
+            transform: translateY(1px) scale(0.985);
+          }}
+
+          /* Accesos rápidos Demo estilo Glass */
+          .glass-demo-box {{
+            margin-top: 24px;
             padding-top: 20px;
             border-top: 1px solid var(--border);
           }}
-          .demo-pills-title {{
+          .glass-demo-title {{
             font-size: 11px;
             font-weight: 700;
             color: var(--text-dim);
             text-transform: uppercase;
             letter-spacing: 0.06em;
-            margin-bottom: 10px;
+            margin-bottom: 11px;
             text-align: center;
           }}
-          .demo-pills {{
+          .glass-demo-pills {{
             display: flex;
             gap: 8px;
             justify-content: center;
+            flex-wrap: wrap;
           }}
-          .demo-pill {{
-            font-size: 11px;
-            padding: 5px 10px;
+          .glass-demo-pill {{
+            font-size: 12px;
+            padding: 6px 12px;
             border-radius: var(--radius-sm);
-            background: var(--bg-elevated);
+            background: rgba(255, 255, 255, 0.04);
             border: 1px solid var(--border);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
             color: var(--text-muted);
             cursor: pointer;
             transition: all 0.15s var(--ease-snappy);
+            font-weight: 600;
           }}
-          .demo-pill:hover {{
-            background: var(--bg-subtle);
+          [data-theme="light"] .glass-demo-pill {{
+            background: rgba(255, 255, 255, 0.8);
+            border: 1px solid rgba(15, 23, 42, 0.1);
+          }}
+          .glass-demo-pill:hover {{
+            background: rgba(56, 189, 248, 0.12);
+            border-color: rgba(56, 189, 248, 0.35);
             color: var(--text-main);
-            border-color: var(--border-highlight);
+            transform: translateY(-1px);
+          }}
+          .glass-demo-pill:active {{
+            transform: scale(0.97);
+          }}
+
+          /* Micro-badge de confianza y seguridad */
+          .glass-trust-chip {{
+            margin-top: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 7px;
+            font-size: 11px;
+            font-weight: 600;
+            color: var(--text-dim);
+            letter-spacing: 0.02em;
+          }}
+          .glass-trust-chip .beacon {{
+            width: 6px;
+            height: 6px;
           }}
         </style>
 
-        <main class='login-container'>
-          <section class='login-card'>
-            <div class='login-header'>
-              <h1 class='login-title'>Iniciar sesión</h1>
-              <p class='login-sub'>Portal seguro de operaciones y telemetría</p>
+        <main class='login-scene'>
+          <div class='ambient-orb orb-1' aria-hidden='true'></div>
+          <div class='ambient-orb orb-2' aria-hidden='true'></div>
+
+          <section class='glass-card'>
+            <div class='glass-header'>
+              <div class='glass-brand-badge'>
+                {icon_shield}
+              </div>
+              <h1 class='glass-title'>Iniciar sesión</h1>
+              <p class='glass-sub'>Portal seguro de operaciones & telemetría en tiempo real</p>
             </div>
+
             {alert_html}
+
             <form method='POST' action='/login' autocomplete='off'>
-              <div class='form-group'>
-                <label class='form-label' for='username'>Usuario</label>
-                <input class='form-input' id='username' name='username' required maxlength='64' autocomplete='username' placeholder='admin.demo'>
+              <div class='glass-form-group'>
+                <label class='glass-label' for='username'>
+                  {icon_user} Usuario
+                </label>
+                <div class='glass-input-wrapper'>
+                  <input class='glass-input' id='username' name='username' required maxlength='64' autocomplete='username' placeholder='admin.demo'>
+                </div>
               </div>
-              <div class='form-group'>
-                <label class='form-label' for='password'>Contraseña</label>
-                <input class='form-input' id='password' name='password' type='password' required maxlength='128' autocomplete='current-password' placeholder='••••••••••••'>
+
+              <div class='glass-form-group'>
+                <label class='glass-label' for='password'>
+                  {icon_lock} Contraseña
+                </label>
+                <div class='glass-input-wrapper'>
+                  <input class='glass-input' id='password' name='password' type='password' required maxlength='128' autocomplete='current-password' placeholder='••••••••••••'>
+                </div>
               </div>
-              <button class='btn-primary' type='submit'>Acceder al panel</button>
+
+              <button class='glass-btn-primary' type='submit'>
+                <span>Acceder al panel</span>
+                {icon_arrow}
+              </button>
             </form>
 
-            <div class='demo-pills-box'>
-              <div class='demo-pills-title'>Accesos de prueba rápidos</div>
-              <div class='demo-pills'>
-                <button type='button' class='demo-pill' onclick='fillDemo("admin.demo", "AdminDemo#2026")'>admin.demo</button>
-                <button type='button' class='demo-pill' onclick='fillDemo("soc.demo", "SocDemo#2026")'>soc.demo</button>
-                <button type='button' class='demo-pill' onclick='fillDemo("usuario.demo", "UsuarioDemo#2026")'>usuario.demo</button>
+            <div class='glass-demo-box'>
+              <div class='glass-demo-title'>Accesos de prueba rápidos</div>
+              <div class='glass-demo-pills'>
+                <button type='button' class='glass-demo-pill' onclick='fillDemo("admin.demo", "AdminDemo#2026")'>admin.demo</button>
+                <button type='button' class='glass-demo-pill' onclick='fillDemo("soc.demo", "SocDemo#2026")'>soc.demo</button>
+                <button type='button' class='glass-demo-pill' onclick='fillDemo("usuario.demo", "UsuarioDemo#2026")'>usuario.demo</button>
               </div>
+            </div>
+
+            <div class='glass-trust-chip'>
+              <span class='beacon'></span>
+              <span>Sesión protegida por HMAC-SHA256 • Telemetría Monotónica</span>
             </div>
           </section>
         </main>
         <script>
           function fillDemo(u, p) {{
-            document.getElementById('username').value = u;
-            document.getElementById('password').value = p;
+            const userEl = document.getElementById('username');
+            const passEl = document.getElementById('password');
+            userEl.value = u;
+            passEl.value = p;
+            userEl.focus();
           }}
         </script>
         """
         self.respond(200, page("Iniciar sesión", content))
 
     def render_access_denied(self, remaining):
+        icon_alert = SVG_ICONS["alert"]
         content = f"""
         <style>
-          .denied-wrap {{ min-height: calc(100vh - 64px); display: grid; place-items: center; padding: 20px; }}
-          .denied-card {{
-            width: 100%; max-width: 460px; background: var(--bg-surface);
-            border: 1px solid rgba(239, 68, 68, 0.3); border-radius: var(--radius-lg);
-            padding: 36px 32px; box-shadow: var(--shadow-card); text-align: center;
+          .denied-scene {{
+            min-height: calc(100vh - 64px);
+            display: grid;
+            place-items: center;
+            padding: 32px 20px;
+            position: relative;
+            overflow: hidden;
           }}
-          .denied-icon {{ margin-bottom: 12px; }}
+          .denied-orb {{
+            position: absolute;
+            width: 360px;
+            height: 360px;
+            border-radius: 50%;
+            background: radial-gradient(circle, rgba(239, 68, 68, 0.28), rgba(220, 38, 38, 0.08));
+            filter: blur(85px);
+            pointer-events: none;
+            z-index: 0;
+            opacity: 0.65;
+          }}
+          .denied-glass-card {{
+            position: relative;
+            z-index: 1;
+            width: 100%;
+            max-width: 460px;
+            background: rgba(14, 20, 36, 0.70);
+            backdrop-filter: blur(24px) saturate(190%);
+            -webkit-backdrop-filter: blur(24px) saturate(190%);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            border-radius: 22px;
+            padding: 38px 34px;
+            box-shadow: inset 0 1px 1px 0 rgba(255, 255, 255, 0.15),
+                        0 24px 60px -12px rgba(0, 0, 0, 0.7);
+            text-align: center;
+          }}
+          [data-theme="light"] .denied-glass-card {{
+            background: rgba(255, 255, 255, 0.75);
+            border: 1px solid rgba(220, 38, 38, 0.35);
+            box-shadow: inset 0 1px 2px 0 rgba(255, 255, 255, 0.95),
+                        0 20px 48px -10px rgba(15, 23, 42, 0.12);
+          }}
+          .denied-icon-badge {{
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: var(--red-bg);
+            border: 1px solid rgba(239, 68, 68, 0.35);
+            margin-bottom: 16px;
+            box-shadow: 0 4px 20px rgba(239, 68, 68, 0.25);
+          }}
           .denied-title {{ font-size: 22px; font-weight: 800; color: var(--red); margin-bottom: 8px; }}
-          .denied-sub {{ color: var(--text-muted); font-size: 14px; margin-bottom: 20px; line-height: 1.5; }}
+          .denied-sub {{ color: var(--text-muted); font-size: 14px; margin-bottom: 22px; line-height: 1.5; }}
           .denied-box {{
-            background: var(--red-bg); border: 1px solid rgba(239, 68, 68, 0.25);
-            padding: 14px; border-radius: var(--radius-sm); color: var(--red); font-size: 13px;
-            font-weight: 600; margin-bottom: 22px;
+            background: var(--red-bg);
+            border: 1px solid rgba(239, 68, 68, 0.28);
+            padding: 14px 18px;
+            border-radius: var(--radius-sm);
+            color: var(--red);
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            backdrop-filter: blur(8px);
           }}
           .btn-back {{
-            display: inline-block; padding: 11px 24px; border-radius: var(--radius-sm);
-            background: var(--bg-elevated); color: var(--text-main); text-decoration: none;
-            font-size: 13px; font-weight: 700; border: 1px solid var(--border);
+            display: inline-block;
+            padding: 12px 26px;
+            border-radius: var(--radius-sm);
+            background: rgba(255, 255, 255, 0.06);
+            color: var(--text-main);
+            text-decoration: none;
+            font-size: 13px;
+            font-weight: 700;
+            border: 1px solid var(--border);
+            backdrop-filter: blur(8px);
+            transition: all 0.18s var(--ease-snappy);
           }}
-          .btn-back:hover {{ background: var(--bg-subtle); }}
+          [data-theme="light"] .btn-back {{
+            background: rgba(255, 255, 255, 0.85);
+            border: 1px solid rgba(15, 23, 42, 0.12);
+          }}
+          .btn-back:hover {{
+            background: var(--bg-subtle);
+            border-color: var(--border-highlight);
+            transform: translateY(-1px);
+          }}
+          .btn-back:active {{
+            transform: translateY(1px) scale(0.98);
+          }}
         </style>
-        <main class='denied-wrap'>
-          <section class='denied-card'>
-            <div class='denied-icon'>{SVG_ICONS["alert"]}</div>
+        <main class='denied-scene'>
+          <div class='denied-orb' aria-hidden='true'></div>
+          <section class='denied-glass-card'>
+            <div class='denied-icon-badge'>{icon_alert}</div>
             <h1 class='denied-title'>Acceso bloqueado temporalmente</h1>
             <p class='denied-sub'>Se detectó un exceso de intentos fallidos. El sistema IR activó la ventana de contención defensiva.</p>
             <div class='denied-box'>
