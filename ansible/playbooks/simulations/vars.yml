@@ -1,21 +1,17 @@
 ---
-# Variables centrales para la Suite de Ataques Red Team y Rollback (TIC Tesis)
-# Alineadas con los outputs activos de Terraform en AWS us-east-2
+# Variables de simulacion actualizadas automaticamente desde Terraform
 
-portal_public_ip: "18.219.62.81"
-portal_url: "http://18.219.62.81"
-aws_region: "us-east-2"
-vpc_id: "vpc-00cd654d72a84e9f0"
-nacl_id: "acl-0c072d7e12b416874"
-
-sensitive_bucket: "tesis-ir-sensitive-data-056176271407-us-east-2"
-evidence_bucket: "tesis-ir-evidence-056176271407-us-east-2"
-logs_bucket: "tesis-ir-logs-056176271407-us-east-2"
-
-dynamodb_incidents_table: "tesis-ir_incidents"
-dynamodb_state_table: "tesis-ir_detection_state"
-
-portal_instance_id: "i-05a276d44211bf7e7"
-test_iam_username: "tesis-ir-temp-escalation-test"
-test_escalation_policy_arn: "arn:aws:iam::aws:policy/ReadOnlyAccess"
-emergency_deny_policy_name: "EmergencyDenyAll"
+portal_public_ip: 18.219.62.81
+portal_url: http://18.219.62.81
+aws_region: us-east-2
+vpc_id: vpc-00cd654d72a84e9f0
+nacl_id: acl-0c072d7e12b416874
+sensitive_bucket: tesis-ir-sensitive-data-056176271407-us-east-2
+evidence_bucket: tesis-ir-evidence-056176271407-us-east-2
+logs_bucket: tesis-ir-logs-056176271407-us-east-2
+dynamodb_incidents_table: tesis-ir_incidents
+dynamodb_state_table: tesis-ir_detection_state
+portal_instance_id: i-05a276d44211bf7e7
+test_iam_username: tesis-ir-temp-escalation-test
+test_escalation_policy_arn: arn:aws:iam::aws:policy/ReadOnlyAccess
+emergency_deny_policy_name: EmergencyDenyAll

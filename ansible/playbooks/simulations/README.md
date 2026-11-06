@@ -65,3 +65,14 @@ Elimina las reglas de bloqueo en Network ACL, remueve usuarios y políticas temp
 ```bash
 ansible-playbook ansible/playbooks/simulations/rollback_cleanup.yml
 ```
+
+---
+
+## 4. Reconstrucción y Sincronización Automática tras Despliegue
+
+Si la infraestructura en AWS fue recreada con Terraform, regenera las variables del laboratorio y el inventario con:
+```bash
+python ansible/scripts/generate_inventory.py
+python ansible/scripts/generate_simulation_vars.py
+```
+Esto leerá las salidas (`outputs`) del nuevo entorno en AWS y sincronizará de forma automática las IPs, buckets, tablas e identificadores de red tanto en el inventario SSM como en `ansible/playbooks/simulations/vars.yml`.
